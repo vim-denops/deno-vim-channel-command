@@ -34,7 +34,7 @@ export class Session {
   constructor(
     reader: Deno.Reader,
     writer: Deno.Writer,
-    callback: Callback = () => undefined,
+    callback: Callback = () => undefined
   ) {
     this.#counter = 0;
     this.#replies = {};
@@ -98,6 +98,11 @@ export class Session {
       }
       throw e;
     }
+  }
+
+  async reply(msgid: number, expr: ReadonlyJsonArray): Promise<void> {
+    const data: Message = [msgid, expr];
+    await this.send(utf8Encoder.encode(JSON.stringify(data)));
   }
 
   async redraw(force = false): Promise<void> {
