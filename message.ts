@@ -1,6 +1,4 @@
-import { ReadonlyJsonAny } from "./json.ts";
-
-export type Message = [number, ReadonlyJsonAny];
+export type Message = [number, unknown];
 
 export function isMessage(data: unknown): data is Message {
   return (

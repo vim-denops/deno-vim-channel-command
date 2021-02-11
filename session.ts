@@ -3,18 +3,12 @@ import {
   Deferred,
   deferred,
 } from "https://deno.land/x/std@0.86.0/async/deferred.ts";
-import { ReadonlyJsonArray } from "./json.ts";
 import { isMessage, Message } from "./message.ts";
 import * as command from "./command.ts";
 
 const MSGID_THRESHOLD = 2 ** 32;
 
 const utf8Encoder = new TextEncoder();
-
-/**
- * Transporter which transport Uint8Array
- */
-export type Transporter = Deno.Reader & Deno.Closer & Deno.Writer;
 
 export type Callback = (this: Session, message: Message) => void;
 
@@ -100,7 +94,7 @@ export class Session {
     }
   }
 
-  async reply(msgid: number, expr: ReadonlyJsonArray): Promise<void> {
+  async reply(msgid: number, expr: unknown): Promise<void> {
     const data: Message = [msgid, expr];
     await this.send(utf8Encoder.encode(JSON.stringify(data)));
   }
@@ -134,7 +128,7 @@ export class Session {
     await this.send(utf8Encoder.encode(JSON.stringify(data)));
   }
 
-  async call(fn: string, ...args: ReadonlyJsonArray): Promise<unknown> {
+  async call(fn: string, ...args: unknown[]): Promise<unknown> {
     const msgid = this.getNextIndex();
     const data: command.CallCommand = ["call", fn, args, msgid];
     const reply: Deferred<Message> = deferred();
@@ -143,7 +137,7 @@ export class Session {
     return (await reply)[1];
   }
 
-  async callNoReply(fn: string, ...args: ReadonlyJsonArray): Promise<void> {
+  async callNoReply(fn: string, ...args: unknown[]): Promise<void> {
     const data: command.CallCommand = ["call", fn, args];
     await this.send(utf8Encoder.encode(JSON.stringify(data)));
   }

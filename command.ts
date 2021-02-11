@@ -1,5 +1,3 @@
-import { ReadonlyJsonArray } from "./json.ts";
-
 export type CommandType = "redraw" | "ex" | "normal" | "eval" | "expr" | "call";
 
 export type RedrawCommand = ["redraw", "" | "force"];
@@ -10,7 +8,7 @@ export type NormalCommand = ["normal", string];
 
 export type ExprCommand = ["expr", string, number?];
 
-export type CallCommand = ["call", string, ReadonlyJsonArray, number?];
+export type CallCommand = ["call", string, unknown[], number?];
 
 export function isRedrawCommand(data: unknown): data is RedrawCommand {
   return (
