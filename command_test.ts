@@ -10,7 +10,7 @@ for (const t of isRedrawCommandTestCases) {
     `isRedrawCommand() returns ${t[1]} for ${JSON.stringify(t[0])}`,
     () => {
       assertEquals(command.isRedrawCommand(t[0]), t[1]);
-    }
+    },
   );
 }
 
@@ -27,7 +27,7 @@ for (const t of isNormalCommandTestCases) {
     `isNormalCommand() returns ${t[1]} for ${JSON.stringify(t[0])}`,
     () => {
       assertEquals(command.isNormalCommand(t[0]), t[1]);
-    }
+    },
   );
 }
 
@@ -40,7 +40,7 @@ for (const t of isExprCommandTestCases) {
     `isExprCommand() returns ${t[1]} for ${JSON.stringify(t[0])}`,
     () => {
       assertEquals(command.isExprCommand(t[0]), t[1]);
-    }
+    },
   );
 }
 
@@ -53,6 +53,6 @@ for (const t of isCallCommandTestCases) {
     `isCallCommand() returns ${t[1]} for ${JSON.stringify(t[0])}`,
     () => {
       assertEquals(command.isCallCommand(t[0]), t[1]);
-    }
+    },
   );
 }

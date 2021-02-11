@@ -28,7 +28,7 @@ export class Session {
   constructor(
     reader: Deno.Reader,
     writer: Deno.Writer,
-    callback: Callback = () => undefined
+    callback: Callback = () => undefined,
   ) {
     this.#counter = 0;
     this.#replies = {};
