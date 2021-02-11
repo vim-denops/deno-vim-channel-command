@@ -51,7 +51,7 @@ export function isCallCommand(data: unknown): data is CallCommand {
   return (
     Array.isArray(data) &&
     (data.length === 3 || data.length === 4) &&
-    data[0] === "expr" &&
+    data[0] === "call" &&
     typeof data[1] === "string" &&
     Array.isArray(data[2]) &&
     (typeof data[3] === "number" || typeof data[3] === "undefined")

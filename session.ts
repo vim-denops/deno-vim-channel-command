@@ -28,7 +28,7 @@ export class Session {
   constructor(
     reader: Deno.Reader,
     writer: Deno.Writer,
-    callback: Callback = () => undefined,
+    callback: Callback = () => undefined
   ) {
     this.#counter = 0;
     this.#replies = {};
@@ -47,7 +47,7 @@ export class Session {
     if (this.#counter >= MSGID_THRESHOLD) {
       this.#counter = 1;
     }
-    return this.#counter;
+    return this.#counter * -1;
   }
 
   private async send(data: Uint8Array): Promise<void> {
