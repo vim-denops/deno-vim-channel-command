@@ -10,7 +10,10 @@ const MSGID_THRESHOLD = 2 ** 32;
 
 const utf8Encoder = new TextEncoder();
 
-export type Callback = (this: Session, message: Message) => void;
+export type Callback = (
+  this: Session,
+  message: Message,
+) => void | Promise<void>;
 
 /**
  * Vim's channel-command Session
@@ -140,5 +143,12 @@ export class Session {
   async callNoReply(fn: string, ...args: unknown[]): Promise<void> {
     const data: command.CallCommand = ["call", fn, args];
     await this.send(utf8Encoder.encode(JSON.stringify(data)));
+  }
+
+  /**
+   * Replace an internal callback
+   */
+  replaceCallback(callback: Callback): void {
+    this.#callback = callback;
   }
 }
