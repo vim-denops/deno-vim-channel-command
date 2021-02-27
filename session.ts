@@ -71,6 +71,9 @@ export class Session {
     const stream = readLines(this.#reader);
     try {
       for await (const text of stream) {
+        if (!text) {
+          continue;
+        }
         try {
           const data = JSON.parse(text);
           if (!isMessage(data)) {
@@ -84,7 +87,7 @@ export class Session {
           }
           reply.resolve(data);
         } catch (e) {
-          console.warn(`Failed to parse received text: ${text}: ${e}`);
+          console.warn(`Failed to parse received text '${text}': ${e}`);
           continue;
         }
       }
