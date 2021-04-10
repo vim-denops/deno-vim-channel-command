@@ -54,13 +54,7 @@ export class Session {
   }
 
   private async send(data: Uint8Array): Promise<void> {
-    while (true) {
-      const n = await this.#writer.write(data);
-      if (n === data.byteLength) {
-        break;
-      }
-      data = data.slice(n);
-    }
+    await Deno.writeAll(this.#writer, data);
   }
 
   /**
