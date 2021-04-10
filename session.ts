@@ -1,8 +1,4 @@
-import { readLines } from "https://deno.land/std@0.86.0/io/mod.ts";
-import {
-  Deferred,
-  deferred,
-} from "https://deno.land/x/std@0.86.0/async/deferred.ts";
+import { Deferred, deferred, readLines } from "./deps.ts";
 import { isMessage, Message } from "./message.ts";
 import * as command from "./command.ts";
 
