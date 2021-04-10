@@ -1,8 +1,4 @@
-import { readLines } from "https://deno.land/std@0.86.0/io/mod.ts";
-import {
-  Deferred,
-  deferred,
-} from "https://deno.land/x/std@0.86.0/async/deferred.ts";
+import { Deferred, deferred, readLines } from "./deps.ts";
 import { isMessage, Message } from "./message.ts";
 import * as command from "./command.ts";
 
@@ -54,13 +50,7 @@ export class Session {
   }
 
   private async send(data: Uint8Array): Promise<void> {
-    while (true) {
-      const n = await this.#writer.write(data);
-      if (n === data.byteLength) {
-        break;
-      }
-      data = data.slice(n);
-    }
+    await Deno.writeAll(this.#writer, data);
   }
 
   /**
