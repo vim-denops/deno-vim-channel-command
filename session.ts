@@ -1,4 +1,4 @@
-import { Deferred, deferred, readLines } from "./deps.ts";
+import { Deferred, deferred, io } from "./deps.ts";
 import { isMessage, Message } from "./message.ts";
 import * as command from "./command.ts";
 
@@ -50,7 +50,7 @@ export class Session {
   }
 
   private async send(data: Uint8Array): Promise<void> {
-    await Deno.writeAll(this.#writer, data);
+    await io.writeAll(this.#writer, data);
   }
 
   /**
@@ -58,7 +58,7 @@ export class Session {
    * This method must be called to start session.
    */
   async listen(): Promise<void> {
-    const stream = readLines(this.#reader);
+    const stream = io.readLines(this.#reader);
     try {
       for await (const text of stream) {
         if (!text) {
