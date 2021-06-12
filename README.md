@@ -1,5 +1,6 @@
 # vim-channel-command
 
+[![deno land](http://img.shields.io/badge/available%20on-deno.land/x-lightgrey.svg?logo=deno)](https://deno.land/x/vim_channel_command)
 [![deno doc](https://doc.deno.land/badge.svg)](https://doc.deno.land/https/deno.land/x/vim_channel_command/mod.ts)
 [![Test](https://github.com/vim-denops/deno-vim-channel-command/workflows/Test/badge.svg)](https://github.com/vim-denops/deno-vim-channel-command/actions?query=workflow%3ATest)
 
