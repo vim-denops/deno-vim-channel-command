@@ -21,6 +21,11 @@ export type SessionOptions = {
    * Response timeout in milliseconds
    */
   responseTimeout?: number;
+
+  /**
+   * A callback called when session raised internal error
+   */
+  errorCallback?: (e: Error) => void;
 };
 
 /**
@@ -55,7 +60,11 @@ export class Session implements Disposable {
     this.#closed = false;
     this.#closedSignal = deferred();
     this.#listener = this.listen().catch((e) => {
-      console.error(`Unexpected error occured: ${e}`);
+      if (options.errorCallback) {
+        options.errorCallback(e);
+      } else {
+        console.error(`Unexpected error occured in session: ${e}`);
+      }
     });
   }
 
