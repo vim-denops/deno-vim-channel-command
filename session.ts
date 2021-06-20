@@ -1,6 +1,7 @@
 iutf8Encoder.encode(JSON.stringify(data)));mport { Deferred, deferred, io } from "./deps.ts";
 import { isMessage, Message } from "./message.ts";
 import * as command from "./command.ts";
+import { Indexer } from "./indexer.ts";
 
 const MSGID_THRESHOLD = 2 ** 32;
 
@@ -15,7 +16,7 @@ export type Callback = (
  * Vim's channel-command Session
  */
 export class Session {
-  #counter: number;
+  #indexer: Indexer;
   #replies: { [key: number]: Deferred<Message> };
   #reader: Deno.Reader;
   #writer: Deno.Writer;
@@ -29,7 +30,7 @@ export class Session {
     writer: Deno.Writer,
     callback: Callback = () => undefined,
   ) {
-    this.#counter = 0;
+    this.#indexer = new Indexer(MSGID_THRESHOLD);
     this.#replies = {};
     this.#reader = reader;
     this.#writer = writer;
@@ -39,14 +40,6 @@ export class Session {
   protected getOrCreateReply(msgid: number): Deferred<Message> {
     this.#replies[msgid] = this.#replies[msgid] || deferred();
     return this.#replies[msgid];
-  }
-
-  private getNextIndex(): number {
-    this.#counter += 1;
-    if (this.#counter >= MSGID_THRESHOLD) {
-      this.#counter = 1;
-    }
-    return this.#counter * -1;
   }
 
   private async send(data: Uint8Array): Promise<void> {
@@ -111,7 +104,7 @@ export class Session {
   }
 
   async expr(expr: string): Promise<unknown> {
-    const msgid = this.getNextIndex();
+    const msgid = this.#indexer.next();
     const data: command.ExprCommand = ["expr", expr, msgid];
     const reply: Deferred<Message> = deferred();
     this.#replies[msgid] = reply;
@@ -125,7 +118,7 @@ export class Session {
   }
 
   async call(fn: string, ...args: unknown[]): Promise<unknown> {
-    const msgid = this.getNextIndex();
+    const msgid = this.#indexer.next();
     const data: command.CallCommand = ["call", fn, args, msgid];
     const reply: Deferred<Message> = deferred();
     this.#replies[msgid] = reply;
