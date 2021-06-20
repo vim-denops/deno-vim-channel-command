@@ -1,4 +1,6 @@
-export type Message = [number, unknown];
+export type MessageId = number;
+
+export type Message = [MessageId, unknown];
 
 export function isMessage(data: unknown): data is Message {
   return (
