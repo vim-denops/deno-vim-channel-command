@@ -52,7 +52,10 @@ export class Session {
   }
 
   private async send(data: Message | command.Command): Promise<void> {
-    await io.writeAll(this.#writer, utf8Encoder.encode(JSON.stringify(data)));
+    await io.writeAll(
+      this.#writer,
+      utf8Encoder.encode(JSON.stringify(data) + "\n"),
+    );
   }
 
   /**
