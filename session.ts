@@ -1,4 +1,4 @@
-import { Deferred, deferred, io } from "./deps.ts";
+import { Deferred, deferred, Disposable, io } from "./deps.ts";
 import { isMessage, Message } from "./message.ts";
 import * as command from "./command.ts";
 import { Indexer } from "./indexer.ts";
@@ -26,7 +26,7 @@ export type SessionOptions = {
 /**
  * Vim's channel-command Session
  */
-export class Session {
+export class Session implements Disposable {
   #indexer: Indexer;
   #waiter: ResponseWaiter;
   #reader: Deno.Reader;
@@ -106,6 +106,10 @@ export class Session {
       }
       throw e;
     }
+  }
+
+  dispose() {
+    this.close();
   }
 
   /**

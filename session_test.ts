@@ -1,5 +1,5 @@
 import { io } from "./deps.ts";
-import { assertThrowsAsync, assertEquals, delay } from "./deps_test.ts";
+import { assertEquals, assertThrowsAsync, delay, using } from "./deps_test.ts";
 import { Session, SessionClosedError } from "./session.ts";
 import * as command from "./command.ts";
 
@@ -378,4 +378,41 @@ Deno.test("Session throws SessionClosedError on 'call' if the session has closed
   }, SessionClosedError);
   await session.waitClosed();
   reader.close();
+});
+
+Deno.test("Session is disposable", async () => {
+  const s2v: Uint8Array[] = []; // Local to Remote
+  const v2s: Uint8Array[] = []; // Remote to Local
+  const sr = new Reader(v2s);
+  const sw = new Writer(s2v);
+  const session = new Session(sr, sw);
+  const vr = new Reader(s2v);
+  const vw = new Writer(v2s);
+  const vim = new Vim(vr, vw, {
+    async call(data) {
+      const [_, fn, args, msgid] = data;
+      assertEquals(fn, "say");
+      assertEquals(args, ["John Titor"]);
+      assertEquals(msgid, 0);
+      await this.send([msgid, `Hello ${args[0]} from Remote`]);
+    },
+  });
+  await using(session, async (session) => {
+    // Session is not closed
+    assertEquals(
+      await session.call("say", "John Titor"),
+      "Hello John Titor from Remote",
+    );
+  });
+  // Session is closed by `dispose`
+  await assertThrowsAsync(async () => {
+    await session.call("say", "John Titor");
+  }, SessionClosedError);
+  // Close
+  sr.close();
+  vr.close();
+  await Promise.all([
+    session.waitClosed(),
+    vim.waitClosed(),
+  ]);
 });
