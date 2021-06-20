@@ -1,6 +1,6 @@
 import { io } from "./deps.ts";
-import { assertEquals, delay } from "./deps_test.ts";
-import { Session } from "./session.ts";
+import { assertThrowsAsync, assertEquals, delay } from "./deps_test.ts";
+import { Session, SessionClosedError } from "./session.ts";
 import * as command from "./command.ts";
 
 const utf8Encoder = new TextEncoder();
@@ -69,6 +69,7 @@ class Vim {
   #reader: Deno.Reader;
   #writer: Deno.Writer;
   #dispatcher: Dispatcher;
+  #listener: Promise<void>;
 
   constructor(
     reader: Deno.Reader,
@@ -95,16 +96,12 @@ class Vim {
       },
       ...dispatcher,
     };
+    this.#listener = this.listen().catch((e) => {
+      console.error("Unexpected error occured", e);
+    });
   }
 
-  async send(data: unknown): Promise<void> {
-    await io.writeAll(
-      this.#writer,
-      utf8Encoder.encode(JSON.stringify(data) + "\n"),
-    );
-  }
-
-  async listen(): Promise<void> {
+  private async listen(): Promise<void> {
     for await (const line of io.readLines(this.#reader)) {
       const record = line.trim();
       if (!record) {
@@ -126,6 +123,17 @@ class Vim {
       }
     }
   }
+
+  waitClosed(): Promise<void> {
+    return this.#listener;
+  }
+
+  async send(data: unknown): Promise<void> {
+    await io.writeAll(
+      this.#writer,
+      utf8Encoder.encode(JSON.stringify(data) + "\n"),
+    );
+  }
 }
 
 Deno.test("Session can invoke 'redraw'", async () => {
@@ -142,12 +150,14 @@ Deno.test("Session can invoke 'redraw'", async () => {
       assertEquals(expr, "");
     },
   });
-  const listeners = [session.listen(), vim.listen()];
   await session.redraw();
   // Close
   sr.close();
   vr.close();
-  await Promise.all(listeners);
+  await Promise.all([
+    session.waitClosed(),
+    vim.waitClosed(),
+  ]);
 });
 
 Deno.test("Session can invoke 'ex'", async () => {
@@ -164,12 +174,14 @@ Deno.test("Session can invoke 'ex'", async () => {
       assertEquals(expr, "echo 'Hello'");
     },
   });
-  const listeners = [session.listen(), vim.listen()];
   await session.ex("echo 'Hello'");
   // Close
   sr.close();
   vr.close();
-  await Promise.all(listeners);
+  await Promise.all([
+    session.waitClosed(),
+    vim.waitClosed(),
+  ]);
 });
 
 Deno.test("Session can invoke 'normal'", async () => {
@@ -186,12 +198,14 @@ Deno.test("Session can invoke 'normal'", async () => {
       assertEquals(expr, "<C-w>p");
     },
   });
-  const listeners = [session.listen(), vim.listen()];
   await session.normal("<C-w>p");
   // Close
   sr.close();
   vr.close();
-  await Promise.all(listeners);
+  await Promise.all([
+    session.waitClosed(),
+    vim.waitClosed(),
+  ]);
 });
 
 Deno.test("Session can invoke 'expr'", async () => {
@@ -210,12 +224,14 @@ Deno.test("Session can invoke 'expr'", async () => {
       await this.send([msgid, "800"]);
     },
   });
-  const listeners = [session.listen(), vim.listen()];
   assertEquals(await session.expr("v:version"), "800");
   // Close
   sr.close();
   vr.close();
-  await Promise.all(listeners);
+  await Promise.all([
+    session.waitClosed(),
+    vim.waitClosed(),
+  ]);
 });
 
 Deno.test("Session can invoke 'expr' without reply", async () => {
@@ -233,12 +249,14 @@ Deno.test("Session can invoke 'expr' without reply", async () => {
       assertEquals(msgid, undefined);
     },
   });
-  const listeners = [session.listen(), vim.listen()];
   await session.exprNoReply("v:version");
   // Close
   sr.close();
   vr.close();
-  await Promise.all(listeners);
+  await Promise.all([
+    session.waitClosed(),
+    vim.waitClosed(),
+  ]);
 });
 
 Deno.test("Session can invoke 'call'", async () => {
@@ -258,7 +276,6 @@ Deno.test("Session can invoke 'call'", async () => {
       await this.send([msgid, `Hello ${args[0]} from Remote`]);
     },
   });
-  const listeners = [session.listen(), vim.listen()];
   assertEquals(
     await session.call("say", "John Titor"),
     "Hello John Titor from Remote",
@@ -266,7 +283,10 @@ Deno.test("Session can invoke 'call'", async () => {
   // Close
   sr.close();
   vr.close();
-  await Promise.all(listeners);
+  await Promise.all([
+    session.waitClosed(),
+    vim.waitClosed(),
+  ]);
 });
 
 Deno.test("Session can invoke 'call' without reply", async () => {
@@ -285,10 +305,77 @@ Deno.test("Session can invoke 'call' without reply", async () => {
       assertEquals(msgid, undefined);
     },
   });
-  const listeners = [session.listen(), vim.listen()];
   await session.callNoReply("say", "John Titor"),
     // Close
     sr.close();
   vr.close();
-  await Promise.all(listeners);
+  await Promise.all([
+    session.waitClosed(),
+    vim.waitClosed(),
+  ]);
+});
+
+Deno.test("Session throws SessionClosedError on 'redraw' if the session has closed", async () => {
+  const buffer: Uint8Array[] = [];
+  const reader = new Reader(buffer);
+  const writer = new Writer(buffer);
+  const session = new Session(reader, writer);
+  session.close();
+  await assertThrowsAsync(async () => {
+    await session.redraw();
+  }, SessionClosedError);
+  await session.waitClosed();
+  reader.close();
+});
+
+Deno.test("Session throws SessionClosedError on 'ex' if the session has closed", async () => {
+  const buffer: Uint8Array[] = [];
+  const reader = new Reader(buffer);
+  const writer = new Writer(buffer);
+  const session = new Session(reader, writer);
+  session.close();
+  await assertThrowsAsync(async () => {
+    await session.ex("echo 'Hello'");
+  }, SessionClosedError);
+  await session.waitClosed();
+  reader.close();
+});
+
+Deno.test("Session throws SessionClosedError on 'normal' if the session has closed", async () => {
+  const buffer: Uint8Array[] = [];
+  const reader = new Reader(buffer);
+  const writer = new Writer(buffer);
+  const session = new Session(reader, writer);
+  session.close();
+  await assertThrowsAsync(async () => {
+    await session.normal("<C-w>p");
+  }, SessionClosedError);
+  await session.waitClosed();
+  reader.close();
+});
+
+Deno.test("Session throws SessionClosedError on 'expr' if the session has closed", async () => {
+  const buffer: Uint8Array[] = [];
+  const reader = new Reader(buffer);
+  const writer = new Writer(buffer);
+  const session = new Session(reader, writer);
+  session.close();
+  await assertThrowsAsync(async () => {
+    await session.expr("v:version");
+  }, SessionClosedError);
+  await session.waitClosed();
+  reader.close();
+});
+
+Deno.test("Session throws SessionClosedError on 'call' if the session has closed", async () => {
+  const buffer: Uint8Array[] = [];
+  const reader = new Reader(buffer);
+  const writer = new Writer(buffer);
+  const session = new Session(reader, writer);
+  session.close();
+  await assertThrowsAsync(async () => {
+    await session.call("say");
+  }, SessionClosedError);
+  await session.waitClosed();
+  reader.close();
 });
