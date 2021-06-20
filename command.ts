@@ -10,6 +10,13 @@ export type ExprCommand = ["expr", string, number?];
 
 export type CallCommand = ["call", string, unknown[], number?];
 
+export type Command =
+  | RedrawCommand
+  | ExCommand
+  | NormalCommand
+  | ExprCommand
+  | CallCommand;
+
 export function isRedrawCommand(data: unknown): data is RedrawCommand {
   return (
     Array.isArray(data) &&

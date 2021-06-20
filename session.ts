@@ -1,4 +1,4 @@
-import { Deferred, deferred, io } from "./deps.ts";
+iutf8Encoder.encode(JSON.stringify(data)));mport { Deferred, deferred, io } from "./deps.ts";
 import { isMessage, Message } from "./message.ts";
 import * as command from "./command.ts";
 
@@ -50,7 +50,7 @@ export class Session {
   }
 
   private async send(data: Uint8Array): Promise<void> {
-    await io.writeAll(this.#writer, data);
+    await io.writeAll(this.#writer, utf8Encoder.encode(JSON.stringify(data)));
   }
 
   /**
@@ -92,22 +92,22 @@ export class Session {
 
   async reply(msgid: number, expr: unknown): Promise<void> {
     const data: Message = [msgid, expr];
-    await this.send(utf8Encoder.encode(JSON.stringify(data)));
+    await this.send(data);
   }
 
   async redraw(force = false): Promise<void> {
     const data: command.RedrawCommand = ["redraw", force ? "force" : ""];
-    await this.send(utf8Encoder.encode(JSON.stringify(data)));
+    await this.send(data);
   }
 
   async ex(expr: string): Promise<void> {
     const data: command.ExCommand = ["ex", expr];
-    await this.send(utf8Encoder.encode(JSON.stringify(data)));
+    await this.send(data);
   }
 
   async normal(expr: string): Promise<void> {
     const data: command.NormalCommand = ["normal", expr];
-    await this.send(utf8Encoder.encode(JSON.stringify(data)));
+    await this.send(data);
   }
 
   async expr(expr: string): Promise<unknown> {
@@ -115,13 +115,13 @@ export class Session {
     const data: command.ExprCommand = ["expr", expr, msgid];
     const reply: Deferred<Message> = deferred();
     this.#replies[msgid] = reply;
-    await this.send(utf8Encoder.encode(JSON.stringify(data)));
+    await this.send(data);
     return (await reply)[1];
   }
 
   async exprNoReply(expr: string): Promise<void> {
     const data: command.ExprCommand = ["expr", expr];
-    await this.send(utf8Encoder.encode(JSON.stringify(data)));
+    await this.send(data);
   }
 
   async call(fn: string, ...args: unknown[]): Promise<unknown> {
@@ -129,13 +129,13 @@ export class Session {
     const data: command.CallCommand = ["call", fn, args, msgid];
     const reply: Deferred<Message> = deferred();
     this.#replies[msgid] = reply;
-    await this.send(utf8Encoder.encode(JSON.stringify(data)));
+    await this.send(data);
     return (await reply)[1];
   }
 
   async callNoReply(fn: string, ...args: unknown[]): Promise<void> {
     const data: command.CallCommand = ["call", fn, args];
-    await this.send(utf8Encoder.encode(JSON.stringify(data)));
+    await this.send(data);
   }
 
   /**
