@@ -1,7 +1,8 @@
-iutf8Encoder.encode(JSON.stringify(data)));mport { Deferred, deferred, io } from "./deps.ts";
+import { io } from "./deps.ts";
 import { isMessage, Message } from "./message.ts";
 import * as command from "./command.ts";
 import { Indexer } from "./indexer.ts";
+import { ResponseWaiter } from "./response_waiter.ts";
 
 const MSGID_THRESHOLD = 2 ** 32;
 
@@ -13,11 +14,21 @@ export type Callback = (
 ) => void | Promise<void>;
 
 /**
+ * Session options
+ */
+export type SessionOptions = {
+  /**
+   * Response timeout in milliseconds
+   */
+  responseTimeout?: number;
+};
+
+/**
  * Vim's channel-command Session
  */
 export class Session {
   #indexer: Indexer;
-  #replies: { [key: number]: Deferred<Message> };
+  #waiter: ResponseWaiter;
   #reader: Deno.Reader;
   #writer: Deno.Writer;
   #callback: Callback;
@@ -29,20 +40,18 @@ export class Session {
     reader: Deno.Reader,
     writer: Deno.Writer,
     callback: Callback = () => undefined,
+    options: SessionOptions = {},
   ) {
     this.#indexer = new Indexer(MSGID_THRESHOLD);
-    this.#replies = {};
+    this.#waiter = new ResponseWaiter(
+      options.responseTimeout,
+    );
     this.#reader = reader;
     this.#writer = writer;
     this.#callback = callback;
   }
 
-  protected getOrCreateReply(msgid: number): Deferred<Message> {
-    this.#replies[msgid] = this.#replies[msgid] || deferred();
-    return this.#replies[msgid];
-  }
-
-  private async send(data: Uint8Array): Promise<void> {
+  private async send(data: Message | command.Command): Promise<void> {
     await io.writeAll(this.#writer, utf8Encoder.encode(JSON.stringify(data)));
   }
 
@@ -63,12 +72,11 @@ export class Session {
             console.warn(`Unexpected data received: ${data}`);
             continue;
           }
-          const reply = this.#replies[data[0]];
-          if (!reply) {
+          if (!this.#waiter.provide(data)) {
+            // The message is not response. Invoke callback
             this.#callback.apply(this, [data]);
             continue;
           }
-          reply.resolve(data);
         } catch (e) {
           console.warn(`Failed to parse received text '${text}': ${e}`);
           continue;
@@ -106,10 +114,11 @@ export class Session {
   async expr(expr: string): Promise<unknown> {
     const msgid = this.#indexer.next();
     const data: command.ExprCommand = ["expr", expr, msgid];
-    const reply: Deferred<Message> = deferred();
-    this.#replies[msgid] = reply;
-    await this.send(data);
-    return (await reply)[1];
+    const [_, response] = await Promise.all([
+      this.send(data),
+      this.#waiter.wait(msgid),
+    ]);
+    return response[1];
   }
 
   async exprNoReply(expr: string): Promise<void> {
@@ -120,10 +129,11 @@ export class Session {
   async call(fn: string, ...args: unknown[]): Promise<unknown> {
     const msgid = this.#indexer.next();
     const data: command.CallCommand = ["call", fn, args, msgid];
-    const reply: Deferred<Message> = deferred();
-    this.#replies[msgid] = reply;
-    await this.send(data);
-    return (await reply)[1];
+    const [_, response] = await Promise.all([
+      this.send(data),
+      this.#waiter.wait(msgid),
+    ]);
+    return response[1];
   }
 
   async callNoReply(fn: string, ...args: unknown[]): Promise<void> {
