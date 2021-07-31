@@ -68,6 +68,13 @@ export class Session implements Disposable {
     });
   }
 
+  private nextMsgid(): number {
+    // NOTE:
+    // msgid MUST be negative for custom vim channel command
+    const msgid = this.#indexer.next() * -1;
+    return msgid;
+  }
+
   private async send(data: Message | command.Command): Promise<void> {
     await io.writeAll(
       this.#writer,
@@ -172,7 +179,7 @@ export class Session implements Disposable {
     if (this.#closed) {
       throw new SessionClosedError();
     }
-    const msgid = this.#indexer.next();
+    const msgid = this.nextMsgid();
     const data: command.ExprCommand = ["expr", expr, msgid];
     const [_, response] = await Promise.all([
       this.send(data),
@@ -193,7 +200,7 @@ export class Session implements Disposable {
     if (this.#closed) {
       throw new SessionClosedError();
     }
-    const msgid = this.#indexer.next();
+    const msgid = this.nextMsgid();
     const data: command.CallCommand = ["call", fn, args, msgid];
     const [_, response] = await Promise.all([
       this.send(data),
