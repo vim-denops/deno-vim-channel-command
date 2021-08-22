@@ -1,10 +1,11 @@
-import { Deferred, deferred, Disposable, io } from "./deps.ts";
+import { Deferred, deferred, Disposable, io, JSONparser } from "./deps.ts";
 import { isMessage, Message } from "./message.ts";
 import * as command from "./command.ts";
 import { Indexer } from "./indexer.ts";
 import { ResponseWaiter } from "./response_waiter.ts";
 
 const MSGID_THRESHOLD = 2 ** 32;
+const BUFFER_SIZE = 32 * 1024;
 
 const utf8Encoder = new TextEncoder();
 
@@ -78,39 +79,37 @@ export class Session implements Disposable {
   private async send(data: Message | command.Command): Promise<void> {
     await io.writeAll(
       this.#writer,
-      utf8Encoder.encode(JSON.stringify(data) + "\n"),
+      utf8Encoder.encode(JSON.stringify(data)),
     );
   }
 
   private async listen(): Promise<void> {
-    const iter = io.readLines(this.#reader);
+    const parser = new JSONparser();
+    parser.onValue = (data, _key, _parent, stack) => {
+      if (stack.length > 0) {
+        return;
+      }
+      if (!isMessage(data)) {
+        console.warn(`Unexpected data received: ${data}`);
+        return;
+      }
+      if (!this.#waiter.provide(data)) {
+        // The message is not response. Invoke callback
+        this.#callback.apply(this, [data]);
+        return;
+      }
+    };
     try {
+      const buf = new Uint8Array(BUFFER_SIZE);
       while (!this.#closed) {
-        const { done, value } = await Promise.race([
+        const n = await Promise.race([
           this.#closedSignal,
-          iter.next(),
+          this.#reader.read(buf),
         ]);
-        if (done) {
-          return;
+        if (n == null) {
+          break;
         }
-        if (!value.trim()) {
-          continue;
-        }
-        try {
-          const data = JSON.parse(value);
-          if (!isMessage(data)) {
-            console.warn(`Unexpected data received: ${data}`);
-            continue;
-          }
-          if (!this.#waiter.provide(data)) {
-            // The message is not response. Invoke callback
-            this.#callback.apply(this, [data]);
-            continue;
-          }
-        } catch (e) {
-          console.warn(`Failed to parse received text '${value}': ${e}`);
-          continue;
-        }
+        parser.write(buf.subarray(0, n));
       }
     } catch (e) {
       if (e instanceof SessionClosedError) {
