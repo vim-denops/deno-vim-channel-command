@@ -1,9 +1,14 @@
-import { io } from "./deps.ts";
+import { io, JSONparser } from "./deps.ts";
 import { assertEquals, assertThrowsAsync, delay, using } from "./deps_test.ts";
 import { Session, SessionClosedError } from "./session.ts";
+import { Indexer } from "./indexer.ts";
 import * as command from "./command.ts";
 
+const MSGID_THRESHOLD = 2 ** 32;
+const BUFFER_SIZE = 32 * 1024;
+
 const utf8Encoder = new TextEncoder();
+const indexer = new Indexer(MSGID_THRESHOLD);
 
 type Dispatcher = {
   redraw: (this: Vim, data: command.RedrawCommand) => void | Promise<void>;
@@ -102,12 +107,11 @@ class Vim {
   }
 
   private async listen(): Promise<void> {
-    for await (const line of io.readLines(this.#reader)) {
-      const record = line.trim();
-      if (!record) {
-        continue;
+    const parser = new JSONparser();
+    parser.onValue = (data, _key, _parent, stack) => {
+      if (stack.length > 0) {
+        return;
       }
-      const data = JSON.parse(record);
       if (command.isRedrawCommand(data)) {
         this.#dispatcher.redraw.call(this, data);
       } else if (command.isExCommand(data)) {
@@ -121,6 +125,14 @@ class Vim {
       } else {
         throw new Error(`Unexpected data received: ${data}`);
       }
+    };
+    const buf = new Uint8Array(BUFFER_SIZE);
+    while (true) {
+      const n = await this.#reader.read(buf);
+      if (n == null) {
+        break;
+      }
+      parser.write(buf.subarray(0, n));
     }
   }
 
@@ -131,7 +143,7 @@ class Vim {
   async send(data: unknown): Promise<void> {
     await io.writeAll(
       this.#writer,
-      utf8Encoder.encode(JSON.stringify(data) + "\n"),
+      utf8Encoder.encode(JSON.stringify(data)),
     );
   }
 }
@@ -309,6 +321,57 @@ Deno.test("Session can invoke 'call' without reply", async () => {
     // Close
     sr.close();
   vr.close();
+  await Promise.all([
+    session.waitClosed(),
+    vim.waitClosed(),
+  ]);
+});
+
+Deno.test("Session can invoke arbitrary callback", async () => {
+  const s2v: Uint8Array[] = []; // Local to Remote
+  const v2s: Uint8Array[] = []; // Remote to Local
+  const sr = new Reader(v2s);
+  const sw = new Writer(s2v);
+  const session = new Session(sr, sw, (message) => {
+    try {
+      const [_, value] = message as [unknown, string];
+      assertEquals(value, "Hello world");
+    } finally {
+      // Close
+      sr.close();
+      vr.close();
+    }
+  });
+  const vr = new Reader(s2v);
+  const vw = new Writer(v2s);
+  const vim = new Vim(vr, vw, {});
+  await vim.send([indexer.next() * -1, "Hello world"]);
+  await Promise.all([
+    session.waitClosed(),
+    vim.waitClosed(),
+  ]);
+});
+
+Deno.test("Session can invoke arbitrary callback (incomplete)", async () => {
+  const s2v: Uint8Array[] = []; // Local to Remote
+  const v2s: Uint8Array[] = []; // Remote to Local
+  const sr = new Reader(v2s);
+  const sw = new Writer(s2v);
+  const session = new Session(sr, sw, (message) => {
+    try {
+      const [_, value] = message as [unknown, string];
+      assertEquals(value, "Hello world");
+    } finally {
+      // Close
+      sr.close();
+      vr.close();
+    }
+  });
+  const vr = new Reader(s2v);
+  const vw = new Writer(v2s);
+  const vim = new Vim(vr, vw, {});
+  await io.writeAll(vw, utf8Encoder.encode(`[${indexer.next() * -1}, "Hello`));
+  await io.writeAll(vw, utf8Encoder.encode(` world"]`));
   await Promise.all([
     session.waitClosed(),
     vim.waitClosed(),
