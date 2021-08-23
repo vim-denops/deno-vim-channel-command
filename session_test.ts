@@ -378,6 +378,33 @@ Deno.test("Session can invoke arbitrary callback (incomplete)", async () => {
   ]);
 });
 
+Deno.test("Session can invoke arbitrary callback (incomplete + massive)", async () => {
+  const data = "0123456789".repeat(100000);
+  const s2v: Uint8Array[] = []; // Local to Remote
+  const v2s: Uint8Array[] = []; // Remote to Local
+  const sr = new Reader(v2s);
+  const sw = new Writer(s2v);
+  const session = new Session(sr, sw, (message) => {
+    try {
+      const [_, value] = message as [unknown, string];
+      assertEquals(value, data + data);
+    } finally {
+      // Close
+      sr.close();
+      vr.close();
+    }
+  });
+  const vr = new Reader(s2v);
+  const vw = new Writer(v2s);
+  const vim = new Vim(vr, vw, {});
+  await io.writeAll(vw, utf8Encoder.encode(`[${indexer.next() * -1}, "${data}`));
+  await io.writeAll(vw, utf8Encoder.encode(`${data}"]`));
+  await Promise.all([
+    session.waitClosed(),
+    vim.waitClosed(),
+  ]);
+});
+
 Deno.test("Session throws SessionClosedError on 'redraw' if the session has closed", async () => {
   const buffer: Uint8Array[] = [];
   const reader = new Reader(buffer);
