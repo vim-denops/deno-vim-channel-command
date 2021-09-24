@@ -397,7 +397,10 @@ Deno.test("Session can invoke arbitrary callback (incomplete + massive)", async 
   const vr = new Reader(s2v);
   const vw = new Writer(v2s);
   const vim = new Vim(vr, vw, {});
-  await io.writeAll(vw, utf8Encoder.encode(`[${indexer.next() * -1}, "${data}`));
+  await io.writeAll(
+    vw,
+    utf8Encoder.encode(`[${indexer.next() * -1}, "${data}`),
+  );
   await io.writeAll(vw, utf8Encoder.encode(`${data}"]`));
   await Promise.all([
     session.waitClosed(),
