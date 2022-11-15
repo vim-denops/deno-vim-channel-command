@@ -1,4 +1,4 @@
-import { Deferred, deferred, Disposable, io, JSONparser } from "./deps.ts";
+import { Deferred, deferred, Disposable, JSONparser, streams } from "./deps.ts";
 import { isMessage, Message } from "./message.ts";
 import * as command from "./command.ts";
 import { Indexer } from "./indexer.ts";
@@ -77,7 +77,7 @@ export class Session implements Disposable {
   }
 
   private async send(data: Message | command.Command): Promise<void> {
-    await io.writeAll(
+    await streams.writeAll(
       this.#writer,
       utf8Encoder.encode(JSON.stringify(data)),
     );
