@@ -1,5 +1,5 @@
-import { io, JSONparser } from "./deps.ts";
-import { assertEquals, assertThrowsAsync, delay, using } from "./deps_test.ts";
+import { JSONparser, streams } from "./deps.ts";
+import { assertEquals, assertRejects, delay, using } from "./deps_test.ts";
 import { Session, SessionClosedError } from "./session.ts";
 import { Indexer } from "./indexer.ts";
 import * as command from "./command.ts";
@@ -22,11 +22,13 @@ class Reader implements Deno.Reader, Deno.Closer {
   #queue: Uint8Array[];
   #remain: Uint8Array;
   #closed: boolean;
+  #signal?: AbortSignal;
 
-  constructor(queue: Uint8Array[]) {
+  constructor(queue: Uint8Array[], signal?: AbortSignal) {
     this.#queue = queue;
     this.#remain = new Uint8Array();
     this.#closed = false;
+    this.#signal = signal;
   }
 
   close(): void {
@@ -43,7 +45,9 @@ class Reader implements Deno.Reader, Deno.Closer {
         this.#remain = v;
         return this.readFromRemain(p);
       }
-      await delay(1);
+      await delay(1, {
+        signal: this.#signal,
+      });
     }
     return null;
   }
@@ -141,7 +145,7 @@ class Vim {
   }
 
   async send(data: unknown): Promise<void> {
-    await io.writeAll(
+    await streams.writeAll(
       this.#writer,
       utf8Encoder.encode(JSON.stringify(data)),
     );
@@ -370,8 +374,11 @@ Deno.test("Session can invoke arbitrary callback (incomplete)", async () => {
   const vr = new Reader(s2v);
   const vw = new Writer(v2s);
   const vim = new Vim(vr, vw, {});
-  await io.writeAll(vw, utf8Encoder.encode(`[${indexer.next() * -1}, "Hello`));
-  await io.writeAll(vw, utf8Encoder.encode(` world"]`));
+  await streams.writeAll(
+    vw,
+    utf8Encoder.encode(`[${indexer.next() * -1}, "Hello`),
+  );
+  await streams.writeAll(vw, utf8Encoder.encode(` world"]`));
   await Promise.all([
     session.waitClosed(),
     vim.waitClosed(),
@@ -397,11 +404,11 @@ Deno.test("Session can invoke arbitrary callback (incomplete + massive)", async 
   const vr = new Reader(s2v);
   const vw = new Writer(v2s);
   const vim = new Vim(vr, vw, {});
-  await io.writeAll(
+  await streams.writeAll(
     vw,
     utf8Encoder.encode(`[${indexer.next() * -1}, "${data}`),
   );
-  await io.writeAll(vw, utf8Encoder.encode(`${data}"]`));
+  await streams.writeAll(vw, utf8Encoder.encode(`${data}"]`));
   await Promise.all([
     session.waitClosed(),
     vim.waitClosed(),
@@ -409,77 +416,88 @@ Deno.test("Session can invoke arbitrary callback (incomplete + massive)", async 
 });
 
 Deno.test("Session throws SessionClosedError on 'redraw' if the session has closed", async () => {
+  const controller = new AbortController();
   const buffer: Uint8Array[] = [];
-  const reader = new Reader(buffer);
+  const reader = new Reader(buffer, controller.signal);
   const writer = new Writer(buffer);
   const session = new Session(reader, writer);
   session.close();
-  await assertThrowsAsync(async () => {
+  await assertRejects(async () => {
     await session.redraw();
   }, SessionClosedError);
   await session.waitClosed();
   reader.close();
+  controller.abort();
 });
 
 Deno.test("Session throws SessionClosedError on 'ex' if the session has closed", async () => {
+  const controller = new AbortController();
   const buffer: Uint8Array[] = [];
-  const reader = new Reader(buffer);
+  const reader = new Reader(buffer, controller.signal);
   const writer = new Writer(buffer);
   const session = new Session(reader, writer);
   session.close();
-  await assertThrowsAsync(async () => {
+  await assertRejects(async () => {
     await session.ex("echo 'Hello'");
   }, SessionClosedError);
   await session.waitClosed();
   reader.close();
+  controller.abort();
 });
 
 Deno.test("Session throws SessionClosedError on 'normal' if the session has closed", async () => {
+  const controller = new AbortController();
   const buffer: Uint8Array[] = [];
-  const reader = new Reader(buffer);
+  const reader = new Reader(buffer, controller.signal);
   const writer = new Writer(buffer);
   const session = new Session(reader, writer);
   session.close();
-  await assertThrowsAsync(async () => {
+  await assertRejects(async () => {
     await session.normal("<C-w>p");
   }, SessionClosedError);
   await session.waitClosed();
   reader.close();
+  controller.abort();
 });
 
 Deno.test("Session throws SessionClosedError on 'expr' if the session has closed", async () => {
+  const controller = new AbortController();
   const buffer: Uint8Array[] = [];
-  const reader = new Reader(buffer);
+  const reader = new Reader(buffer, controller.signal);
   const writer = new Writer(buffer);
   const session = new Session(reader, writer);
   session.close();
-  await assertThrowsAsync(async () => {
+  await assertRejects(async () => {
     await session.expr("v:version");
   }, SessionClosedError);
   await session.waitClosed();
   reader.close();
+  controller.abort();
 });
 
 Deno.test("Session throws SessionClosedError on 'call' if the session has closed", async () => {
+  const controller = new AbortController();
   const buffer: Uint8Array[] = [];
-  const reader = new Reader(buffer);
+  const reader = new Reader(buffer, controller.signal);
   const writer = new Writer(buffer);
   const session = new Session(reader, writer);
   session.close();
-  await assertThrowsAsync(async () => {
+  await assertRejects(async () => {
     await session.call("say");
   }, SessionClosedError);
   await session.waitClosed();
   reader.close();
+  controller.abort();
 });
 
 Deno.test("Session is disposable", async () => {
+  const controller = new AbortController();
   const s2v: Uint8Array[] = []; // Local to Remote
   const v2s: Uint8Array[] = []; // Remote to Local
-  const sr = new Reader(v2s);
+  const sr = new Reader(v2s, controller.signal);
   const sw = new Writer(s2v);
   const session = new Session(sr, sw);
-  const vr = new Reader(s2v);
+  const vr = new Reader(s2v, controller.signal);
   const vw = new Writer(v2s);
   const vim = new Vim(vr, vw, {
     async call(data) {
@@ -498,7 +516,7 @@ Deno.test("Session is disposable", async () => {
     );
   });
   // Session is closed by `dispose`
-  await assertThrowsAsync(async () => {
+  await assertRejects(async () => {
     await session.call("say", "John Titor");
   }, SessionClosedError);
   // Close
@@ -508,4 +526,5 @@ Deno.test("Session is disposable", async () => {
     session.waitClosed(),
     vim.waitClosed(),
   ]);
+  controller.abort();
 });
