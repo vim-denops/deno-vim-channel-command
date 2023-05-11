@@ -1,4 +1,4 @@
-import { assertEquals } from "https://deno.land/std@0.164.0/testing/asserts.ts";
+import { assertEquals } from "https://deno.land/std@0.186.0/testing/asserts.ts";
 import * as command from "./command.ts";
 
 const isRedrawCommandTestCases = [
