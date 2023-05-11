@@ -6,4 +6,7 @@ export type {
 } from "https://deno.land/x/std@0.186.0/async/deferred.ts";
 export type { Disposable } from "https://deno.land/x/disposable@v1.1.1/mod.ts";
 
-export { default as JSONparser } from "https://deno.land/x/streamparser_json@v0.0.10/jsonparser.ts";
+// NOTE:
+// streamparser-json must be v0.0.5 because it automatically end-up parsing without separator after v0.0.5
+// https://github.com/juanjoDiaz/streamparser-json/commit/577e918b90c19d6758b87d41bdb6c5571a2c012d
+export { default as JSONparser } from "https://deno.land/x/streamparser_json@v0.0.5/jsonparse.ts#=";
