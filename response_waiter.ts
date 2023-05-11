@@ -1,4 +1,4 @@
-import { Deferred, deferred } from "./deps.ts";
+import { Deferred, deferred } from "https://deno.land/std@0.186.0/async/mod.ts";
 import { Message, MessageId } from "./message.ts";
 
 const DEFAULT_RESPONSE_TIMEOUT = 10000; // milliseconds

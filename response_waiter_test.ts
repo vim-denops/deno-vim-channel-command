@@ -1,4 +1,7 @@
-import { assertEquals, assertRejects } from "./deps_test.ts";
+import {
+  assertEquals,
+  assertRejects,
+} from "https://deno.land/std@0.186.0/testing/asserts.ts";
 import { Message, MessageId } from "./message.ts";
 import { ResponseWaiter, TimeoutError } from "./response_waiter.ts";
 

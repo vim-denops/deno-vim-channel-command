@@ -1,5 +1,5 @@
+import { using } from "https://deno.land/x/disposable@v1.1.1/mod.ts";
 import { Message, Session } from "../mod.ts";
-import { using } from "../deps_test.ts";
 
 // NOTE:
 // Do NOT use 'console.log()' while stdout is used to communicate with Vim

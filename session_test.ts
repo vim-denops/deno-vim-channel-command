@@ -1,7 +1,16 @@
-import { JSONparser, streams } from "./deps.ts";
-import { assertEquals, assertRejects, delay, using } from "./deps_test.ts";
+import * as streams from "https://deno.land/std@0.186.0/streams/mod.ts";
+import {
+  assertEquals,
+  assertRejects,
+} from "https://deno.land/std@0.186.0/testing/asserts.ts";
+import { delay } from "https://deno.land/std@0.186.0/async/mod.ts";
+import { using } from "https://deno.land/x/disposable@v1.1.1/mod.ts";
+import { Indexer } from "https://deno.land/x/indexer@v0.1.0/mod.ts";
+// NOTE:
+// streamparser-json must be v0.0.5 because it automatically end-up parsing without separator after v0.0.5
+// https://github.com/juanjoDiaz/streamparser-json/commit/577e918b90c19d6758b87d41bdb6c5571a2c012d
+import JSONParser from "https://deno.land/x/streamparser_json@v0.0.5/jsonparse.ts#=";
 import { Session, SessionClosedError } from "./session.ts";
-import { Indexer } from "./indexer.ts";
 import * as command from "./command.ts";
 
 const MSGID_THRESHOLD = 2 ** 32;
@@ -111,7 +120,7 @@ class Vim {
   }
 
   private async listen(): Promise<void> {
-    const parser = new JSONparser();
+    const parser = new JSONParser();
     parser.onValue = (data, _key, _parent, stack) => {
       if (stack.length > 0) {
         return;
