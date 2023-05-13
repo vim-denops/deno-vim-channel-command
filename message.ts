@@ -10,3 +10,7 @@ export function isMessage(data: unknown): data is Message {
     typeof data[1] !== "undefined"
   );
 }
+
+export function buildMessage(msgid: number, value: unknown): Message {
+  return [msgid, value];
+}

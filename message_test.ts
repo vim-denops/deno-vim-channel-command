@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.186.0/testing/asserts.ts";
-import * as message from "./message.ts";
+import { buildMessage, isMessage } from "./message.ts";
 
 const isMessageTestCases = [
   [[12, "hello"], true],
@@ -7,6 +7,12 @@ const isMessageTestCases = [
 ];
 for (const t of isMessageTestCases) {
   Deno.test(`isMessage() returns ${t[1]} for ${JSON.stringify(t[0])}`, () => {
-    assertEquals(message.isMessage(t[0]), t[1]);
+    assertEquals(isMessage(t[0]), t[1]);
   });
 }
+
+Deno.test("buildMessage", async (t) => {
+  await t.step("builds a message", () => {
+    assertEquals(buildMessage(1, "Hello"), [1, "Hello"]);
+  });
+});
