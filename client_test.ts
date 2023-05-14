@@ -6,6 +6,40 @@ import {
 import { buildMessage } from "./message.ts";
 import { Client } from "./client.ts";
 
+Deno.test("Client.reply", async (t) => {
+  await t.step("sends a message", () => {
+    const receives: unknown[] = [];
+    const session = {
+      send: (message: unknown) => {
+        receives.push(message);
+      },
+      recv: () => {
+        throw new Error("should not be called");
+      },
+    };
+    const client = new Client(session);
+    client.reply(1, "Hello");
+    client.reply(2, "World");
+    assertEquals(receives, [
+      [1, "Hello"],
+      [2, "World"],
+    ]);
+  });
+
+  await t.step("throws an error when send fails", () => {
+    const session = {
+      send: () => {
+        throw new Error("send error");
+      },
+      recv: () => {
+        throw new Error("should not be called");
+      },
+    };
+    const client = new Client(session);
+    assertThrows(() => client.redraw(), Error, "send error");
+  });
+});
+
 Deno.test("Client.redraw", async (t) => {
   await t.step("sends a redraw command", () => {
     const receives: unknown[] = [];
