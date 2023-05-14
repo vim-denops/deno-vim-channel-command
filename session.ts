@@ -9,22 +9,6 @@ import { isMessage, Message } from "./message.ts";
 
 const shutdown = Symbol("shutdown");
 
-export type SessionOptions = {
-  /**
-   * The callback function to be called when an invalid message is received.
-   * The default behavior is to ignore the message.
-   * @param {unknown} message The invalid message.
-   */
-  onInvalidMessage?: (message: unknown) => void;
-
-  /**
-   * The callback function to be called when a message is received.
-   * The default behavior is to ignore the message.
-   * @param {Message} message The received message.
-   */
-  onMessage?: (message: Message) => void;
-};
-
 /**
  * Session is a wrapper of ReadableStream and WritableStream to send commands and receive messages.
  *
@@ -35,12 +19,10 @@ export type SessionOptions = {
  * const session = new Session(
  *   Deno.stdin.readable,
  *   Deno.stdout.writable,
- *   {
- *     onMessage: (message) => {
- *       console.log("Recv:", message);
- *     },
- *   }
  * );
+ * session.onMessage = (message) => {
+ *   console.log("Recv:", message);
+ * };
  * session.start();
  *
  * // ...
@@ -82,14 +64,7 @@ export class Session {
   constructor(
     reader: ReadableStream<Uint8Array>,
     writer: WritableStream<Uint8Array>,
-    options: SessionOptions = {},
   ) {
-    const {
-      onInvalidMessage,
-      onMessage,
-    } = options;
-    this.onInvalidMessage = onInvalidMessage;
-    this.onMessage = onMessage;
     this.#outer = { reader, writer };
     this.#inner = channel();
   }

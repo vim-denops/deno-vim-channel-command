@@ -18,19 +18,19 @@ import {
 } from "https://deno.land/x/streamtools@v0.4.1/mod.ts";
 import { buildRedrawCommand } from "./command.ts";
 import { buildMessage, Message } from "./message.ts";
-import { Session, SessionOptions } from "./session.ts";
+import { Session } from "./session.ts";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-function createDummySession(options: SessionOptions = {}): {
+function createDummySession(): {
   input: Channel<Uint8Array>;
   output: Channel<Uint8Array>;
   session: Session;
 } {
   const input = channel<Uint8Array>();
   const output = channel<Uint8Array>();
-  const session = new Session(input.reader, output.writer, options);
+  const session = new Session(input.reader, output.writer);
   return { input, output, session };
 }
 
@@ -141,11 +141,10 @@ Deno.test("Session.start", async (t) => {
     "calls `onMessage` when a message is received",
     async () => {
       const received: Message[] = [];
-      const { session, input } = createDummySession({
-        onMessage(message) {
-          received.push(message);
-        },
-      });
+      const { session, input } = createDummySession();
+      session.onMessage = (message) => {
+        received.push(message);
+      };
 
       session.start();
 
