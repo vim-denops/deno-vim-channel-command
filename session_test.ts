@@ -1,539 +1,296 @@
-import * as streams from "https://deno.land/std@0.186.0/streams/mod.ts";
 import {
+  assert,
   assertEquals,
+  AssertionError,
   assertRejects,
+  assertThrows,
 } from "https://deno.land/std@0.186.0/testing/asserts.ts";
-import { delay } from "https://deno.land/std@0.186.0/async/mod.ts";
-import { using } from "https://deno.land/x/disposable@v1.1.1/mod.ts";
-import { Indexer } from "https://deno.land/x/indexer@v0.1.0/mod.ts";
-// NOTE:
-// streamparser-json must be v0.0.5 because it automatically end-up parsing without separator after v0.0.5
-// https://github.com/juanjoDiaz/streamparser-json/commit/577e918b90c19d6758b87d41bdb6c5571a2c012d
-import JSONParser from "https://deno.land/x/streamparser_json@v0.0.5/jsonparse.ts#=";
-import { Session, SessionClosedError } from "./session.ts";
-import * as command from "./command.ts";
+import {
+  deadline,
+  DeadlineError,
+  deferred,
+} from "https://deno.land/std@0.186.0/async/mod.ts";
+import {
+  Channel,
+  channel,
+  pop,
+  push,
+} from "https://deno.land/x/streamtools@v0.4.1/mod.ts";
+import { buildRedrawCommand } from "./command.ts";
+import { buildMessage, Message } from "./message.ts";
+import { Session, SessionOptions } from "./session.ts";
 
-const MSGID_THRESHOLD = 2 ** 32;
-const BUFFER_SIZE = 32 * 1024;
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
 
-const utf8Encoder = new TextEncoder();
-const indexer = new Indexer(MSGID_THRESHOLD);
+function createDummySession(options: SessionOptions = {}): {
+  input: Channel<Uint8Array>;
+  output: Channel<Uint8Array>;
+  session: Session;
+} {
+  const input = channel<Uint8Array>();
+  const output = channel<Uint8Array>();
+  const session = new Session(input.reader, output.writer, options);
+  return { input, output, session };
+}
 
-type Dispatcher = {
-  redraw: (this: Vim, data: command.RedrawCommand) => void | Promise<void>;
-  ex: (this: Vim, data: command.ExCommand) => void | Promise<void>;
-  normal: (this: Vim, data: command.NormalCommand) => void | Promise<void>;
-  expr: (this: Vim, data: command.ExprCommand) => void | Promise<void>;
-  call: (this: Vim, data: command.CallCommand) => void | Promise<void>;
-};
-
-class Reader implements Deno.Reader, Deno.Closer {
-  #queue: Uint8Array[];
-  #remain: Uint8Array;
-  #closed: boolean;
-  #signal?: AbortSignal;
-
-  constructor(queue: Uint8Array[], signal?: AbortSignal) {
-    this.#queue = queue;
-    this.#remain = new Uint8Array();
-    this.#closed = false;
-    this.#signal = signal;
+function ensureNotNull<T>(value: T | null): T {
+  if (value === null) {
+    throw new AssertionError("value must not be null");
   }
+  return value;
+}
 
-  close(): void {
-    this.#closed = true;
-  }
+Deno.test("Session.send", async (t) => {
+  await t.step(
+    "throws an error if the session is not started",
+    () => {
+      const { session } = createDummySession();
 
-  async read(p: Uint8Array): Promise<number | null> {
-    if (this.#remain.length) {
-      return this.readFromRemain(p);
-    }
-    while (!this.#closed || this.#queue.length) {
-      const v = this.#queue.shift();
-      if (v) {
-        this.#remain = v;
-        return this.readFromRemain(p);
-      }
-      await delay(1, {
-        signal: this.#signal,
+      const command = buildRedrawCommand();
+      assertThrows(
+        () => session.send(command),
+        Error,
+        "Session is not running",
+      );
+    },
+  );
+
+  await t.step(
+    "sends a command to the specified writer",
+    async () => {
+      const { session, output } = createDummySession();
+
+      session.start();
+
+      const command = buildRedrawCommand();
+      session.send(command);
+      assertEquals(
+        JSON.parse(decoder.decode(ensureNotNull(await pop(output.reader)))),
+        command,
+      );
+    },
+  );
+
+  await t.step(
+    "sends a message to the specified writer",
+    async () => {
+      const { session, output } = createDummySession();
+
+      session.start();
+
+      const message = buildMessage(0, "Hello");
+      session.send(message);
+      assertEquals(
+        JSON.parse(decoder.decode(ensureNotNull(await pop(output.reader)))),
+        message,
+      );
+    },
+  );
+});
+
+Deno.test("Session.recv", async (t) => {
+  await t.step(
+    "throws an error if the session is not started",
+    () => {
+      const { session } = createDummySession();
+
+      assertThrows(() => session.recv(-1), Error, "Session is not running");
+    },
+  );
+
+  await t.step(
+    "waits a command response message and resolves with it",
+    async () => {
+      const { session, input } = createDummySession();
+
+      session.start();
+
+      const response = session.recv(-1);
+
+      const message = buildMessage(-1, "Hello");
+      await push(input.writer, encoder.encode(JSON.stringify(message)));
+      assertEquals(await response, message);
+    },
+  );
+});
+
+Deno.test("Session.start", async (t) => {
+  await t.step(
+    "throws an error if the session is already started",
+    () => {
+      const { session } = createDummySession();
+
+      session.start();
+      assertThrows(() => session.start(), Error, "Session is already running");
+    },
+  );
+
+  await t.step(
+    "locks specified reader and writer",
+    () => {
+      const { session, input, output } = createDummySession();
+
+      session.start();
+      assert(input.reader.locked, "reader is not locked");
+      assert(output.writer.locked, "writer is not locked");
+    },
+  );
+
+  await t.step(
+    "calls `onMessage` when a message is received",
+    async () => {
+      const received: Message[] = [];
+      const { session, input } = createDummySession({
+        onMessage(message) {
+          received.push(message);
+        },
       });
-    }
-    return null;
-  }
 
-  private readFromRemain(p: Uint8Array): number {
-    const size = p.byteLength;
-    const head = this.#remain.slice(0, size);
-    this.#remain = this.#remain.slice(size);
-    p.set(head);
-    return head.byteLength;
-  }
-}
+      session.start();
 
-class Writer implements Deno.Writer {
-  #queue: Uint8Array[];
-
-  constructor(queue: Uint8Array[]) {
-    this.#queue = queue;
-  }
-
-  write(p: Uint8Array): Promise<number> {
-    this.#queue.push(p);
-    return Promise.resolve(p.length);
-  }
-}
-
-class Vim {
-  #reader: Deno.Reader;
-  #writer: Deno.Writer;
-  #dispatcher: Dispatcher;
-  #listener: Promise<void>;
-
-  constructor(
-    reader: Deno.Reader,
-    writer: Deno.Writer,
-    dispatcher: Partial<Dispatcher>,
-  ) {
-    this.#reader = reader;
-    this.#writer = writer;
-    this.#dispatcher = {
-      redraw(data) {
-        throw new Error(`Unexpected call: ${data}`);
-      },
-      ex(data) {
-        throw new Error(`Unexpected call: ${data}`);
-      },
-      normal(data) {
-        throw new Error(`Unexpected call: ${data}`);
-      },
-      expr(data) {
-        throw new Error(`Unexpected call: ${data}`);
-      },
-      call(data) {
-        throw new Error(`Unexpected call: ${data}`);
-      },
-      ...dispatcher,
-    };
-    this.#listener = this.listen().catch((e) => {
-      console.error("Unexpected error occured", e);
-    });
-  }
-
-  private async listen(): Promise<void> {
-    const parser = new JSONParser();
-    parser.onValue = (data, _key, _parent, stack) => {
-      if (stack.length > 0) {
-        return;
-      }
-      if (command.isRedrawCommand(data)) {
-        this.#dispatcher.redraw.call(this, data);
-      } else if (command.isExCommand(data)) {
-        this.#dispatcher.ex.call(this, data);
-      } else if (command.isNormalCommand(data)) {
-        this.#dispatcher.normal.call(this, data);
-      } else if (command.isExprCommand(data)) {
-        this.#dispatcher.expr.call(this, data);
-      } else if (command.isCallCommand(data)) {
-        this.#dispatcher.call.call(this, data);
-      } else {
-        throw new Error(`Unexpected data received: ${data}`);
-      }
-    };
-    const buf = new Uint8Array(BUFFER_SIZE);
-    while (true) {
-      const n = await this.#reader.read(buf);
-      if (n == null) {
-        break;
-      }
-      parser.write(buf.subarray(0, n));
-    }
-  }
-
-  waitClosed(): Promise<void> {
-    return this.#listener;
-  }
-
-  async send(data: unknown): Promise<void> {
-    await streams.writeAll(
-      this.#writer,
-      utf8Encoder.encode(JSON.stringify(data)),
-    );
-  }
-}
-
-Deno.test("Session can invoke 'redraw'", async () => {
-  const s2v: Uint8Array[] = []; // Local to Remote
-  const v2s: Uint8Array[] = []; // Remote to Local
-  const sr = new Reader(v2s);
-  const sw = new Writer(s2v);
-  const session = new Session(sr, sw);
-  const vr = new Reader(s2v);
-  const vw = new Writer(v2s);
-  const vim = new Vim(vr, vw, {
-    redraw(data) {
-      const [_, expr] = data;
-      assertEquals(expr, "");
+      const message: Message = [1, 3];
+      await push(input.writer, encoder.encode(JSON.stringify(message)));
+      assertEquals(received, [message]);
     },
-  });
-  await session.redraw();
-  // Close
-  sr.close();
-  vr.close();
-  await Promise.all([
-    session.waitClosed(),
-    vim.waitClosed(),
-  ]);
-});
-
-Deno.test("Session can invoke 'ex'", async () => {
-  const s2v: Uint8Array[] = []; // Local to Remote
-  const v2s: Uint8Array[] = []; // Remote to Local
-  const sr = new Reader(v2s);
-  const sw = new Writer(s2v);
-  const session = new Session(sr, sw);
-  const vr = new Reader(s2v);
-  const vw = new Writer(v2s);
-  const vim = new Vim(vr, vw, {
-    ex(data) {
-      const [_, expr] = data;
-      assertEquals(expr, "echo 'Hello'");
-    },
-  });
-  await session.ex("echo 'Hello'");
-  // Close
-  sr.close();
-  vr.close();
-  await Promise.all([
-    session.waitClosed(),
-    vim.waitClosed(),
-  ]);
-});
-
-Deno.test("Session can invoke 'normal'", async () => {
-  const s2v: Uint8Array[] = []; // Local to Remote
-  const v2s: Uint8Array[] = []; // Remote to Local
-  const sr = new Reader(v2s);
-  const sw = new Writer(s2v);
-  const session = new Session(sr, sw);
-  const vr = new Reader(s2v);
-  const vw = new Writer(v2s);
-  const vim = new Vim(vr, vw, {
-    normal(data) {
-      const [_, expr] = data;
-      assertEquals(expr, "<C-w>p");
-    },
-  });
-  await session.normal("<C-w>p");
-  // Close
-  sr.close();
-  vr.close();
-  await Promise.all([
-    session.waitClosed(),
-    vim.waitClosed(),
-  ]);
-});
-
-Deno.test("Session can invoke 'expr'", async () => {
-  const s2v: Uint8Array[] = []; // Local to Remote
-  const v2s: Uint8Array[] = []; // Remote to Local
-  const sr = new Reader(v2s);
-  const sw = new Writer(s2v);
-  const session = new Session(sr, sw);
-  const vr = new Reader(s2v);
-  const vw = new Writer(v2s);
-  const vim = new Vim(vr, vw, {
-    async expr(data) {
-      const [_, expr, msgid] = data;
-      assertEquals(expr, "v:version");
-      assertEquals(msgid, 0);
-      await this.send([msgid, "800"]);
-    },
-  });
-  assertEquals(await session.expr("v:version"), "800");
-  // Close
-  sr.close();
-  vr.close();
-  await Promise.all([
-    session.waitClosed(),
-    vim.waitClosed(),
-  ]);
-});
-
-Deno.test("Session can invoke 'expr' without reply", async () => {
-  const s2v: Uint8Array[] = []; // Local to Remote
-  const v2s: Uint8Array[] = []; // Remote to Local
-  const sr = new Reader(v2s);
-  const sw = new Writer(s2v);
-  const session = new Session(sr, sw);
-  const vr = new Reader(s2v);
-  const vw = new Writer(v2s);
-  const vim = new Vim(vr, vw, {
-    expr(data) {
-      const [_, expr, msgid] = data;
-      assertEquals(expr, "v:version");
-      assertEquals(msgid, undefined);
-    },
-  });
-  await session.exprNoReply("v:version");
-  // Close
-  sr.close();
-  vr.close();
-  await Promise.all([
-    session.waitClosed(),
-    vim.waitClosed(),
-  ]);
-});
-
-Deno.test("Session can invoke 'call'", async () => {
-  const s2v: Uint8Array[] = []; // Local to Remote
-  const v2s: Uint8Array[] = []; // Remote to Local
-  const sr = new Reader(v2s);
-  const sw = new Writer(s2v);
-  const session = new Session(sr, sw);
-  const vr = new Reader(s2v);
-  const vw = new Writer(v2s);
-  const vim = new Vim(vr, vw, {
-    async call(data) {
-      const [_, fn, args, msgid] = data;
-      assertEquals(fn, "say");
-      assertEquals(args, ["John Titor"]);
-      assertEquals(msgid, 0);
-      await this.send([msgid, `Hello ${args[0]} from Remote`]);
-    },
-  });
-  assertEquals(
-    await session.call("say", "John Titor"),
-    "Hello John Titor from Remote",
   );
-  // Close
-  sr.close();
-  vr.close();
-  await Promise.all([
-    session.waitClosed(),
-    vim.waitClosed(),
-  ]);
 });
 
-Deno.test("Session can invoke 'call' without reply", async () => {
-  const s2v: Uint8Array[] = []; // Local to Remote
-  const v2s: Uint8Array[] = []; // Remote to Local
-  const sr = new Reader(v2s);
-  const sw = new Writer(s2v);
-  const session = new Session(sr, sw);
-  const vr = new Reader(s2v);
-  const vw = new Writer(v2s);
-  const vim = new Vim(vr, vw, {
-    call(data) {
-      const [_, fn, args, msgid] = data;
-      assertEquals(fn, "say");
-      assertEquals(args, ["John Titor"]);
-      assertEquals(msgid, undefined);
+Deno.test("Session.wait", async (t) => {
+  await t.step(
+    "throws an error if the session is not started",
+    () => {
+      const { session } = createDummySession();
+
+      assertThrows(() => session.wait(), Error, "Session is not running");
     },
-  });
-  await session.callNoReply("say", "John Titor"),
-    // Close
-    sr.close();
-  vr.close();
-  await Promise.all([
-    session.waitClosed(),
-    vim.waitClosed(),
-  ]);
-});
-
-Deno.test("Session can invoke arbitrary callback", async () => {
-  const s2v: Uint8Array[] = []; // Local to Remote
-  const v2s: Uint8Array[] = []; // Remote to Local
-  const sr = new Reader(v2s);
-  const sw = new Writer(s2v);
-  const session = new Session(sr, sw, (message) => {
-    try {
-      const [_, value] = message as [unknown, string];
-      assertEquals(value, "Hello world");
-    } finally {
-      // Close
-      sr.close();
-      vr.close();
-    }
-  });
-  const vr = new Reader(s2v);
-  const vw = new Writer(v2s);
-  const vim = new Vim(vr, vw, {});
-  await vim.send([indexer.next() * -1, "Hello world"]);
-  await Promise.all([
-    session.waitClosed(),
-    vim.waitClosed(),
-  ]);
-});
-
-Deno.test("Session can invoke arbitrary callback (incomplete)", async () => {
-  const s2v: Uint8Array[] = []; // Local to Remote
-  const v2s: Uint8Array[] = []; // Remote to Local
-  const sr = new Reader(v2s);
-  const sw = new Writer(s2v);
-  const session = new Session(sr, sw, (message) => {
-    try {
-      const [_, value] = message as [unknown, string];
-      assertEquals(value, "Hello world");
-    } finally {
-      // Close
-      sr.close();
-      vr.close();
-    }
-  });
-  const vr = new Reader(s2v);
-  const vw = new Writer(v2s);
-  const vim = new Vim(vr, vw, {});
-  await streams.writeAll(
-    vw,
-    utf8Encoder.encode(`[${indexer.next() * -1}, "Hello`),
   );
-  await streams.writeAll(vw, utf8Encoder.encode(` world"]`));
-  await Promise.all([
-    session.waitClosed(),
-    vim.waitClosed(),
-  ]);
-});
 
-Deno.test("Session can invoke arbitrary callback (incomplete + massive)", async () => {
-  const data = "0123456789".repeat(100000);
-  const s2v: Uint8Array[] = []; // Local to Remote
-  const v2s: Uint8Array[] = []; // Remote to Local
-  const sr = new Reader(v2s);
-  const sw = new Writer(s2v);
-  const session = new Session(sr, sw, (message) => {
-    try {
-      const [_, value] = message as [unknown, string];
-      assertEquals(value, data + data);
-    } finally {
-      // Close
-      sr.close();
-      vr.close();
-    }
-  });
-  const vr = new Reader(s2v);
-  const vw = new Writer(v2s);
-  const vim = new Vim(vr, vw, {});
-  await streams.writeAll(
-    vw,
-    utf8Encoder.encode(`[${indexer.next() * -1}, "${data}`),
-  );
-  await streams.writeAll(vw, utf8Encoder.encode(`${data}"]`));
-  await Promise.all([
-    session.waitClosed(),
-    vim.waitClosed(),
-  ]);
-});
+  await t.step(
+    "returns a promise that is resolved when the session is closed (reader is closed)",
+    async () => {
+      const output = channel<Uint8Array>();
+      const guard = deferred();
+      const session = new Session(
+        // Reader that is not closed until the guard is resolved
+        new ReadableStream({
+          async start(controller) {
+            await guard;
+            controller.close();
+          },
+        }),
+        output.writer,
+      );
 
-Deno.test("Session throws SessionClosedError on 'redraw' if the session has closed", async () => {
-  const controller = new AbortController();
-  const buffer: Uint8Array[] = [];
-  const reader = new Reader(buffer, controller.signal);
-  const writer = new Writer(buffer);
-  const session = new Session(reader, writer);
-  session.close();
-  await assertRejects(async () => {
-    await session.redraw();
-  }, SessionClosedError);
-  await session.waitClosed();
-  reader.close();
-  controller.abort();
-});
+      session.start();
 
-Deno.test("Session throws SessionClosedError on 'ex' if the session has closed", async () => {
-  const controller = new AbortController();
-  const buffer: Uint8Array[] = [];
-  const reader = new Reader(buffer, controller.signal);
-  const writer = new Writer(buffer);
-  const session = new Session(reader, writer);
-  session.close();
-  await assertRejects(async () => {
-    await session.ex("echo 'Hello'");
-  }, SessionClosedError);
-  await session.waitClosed();
-  reader.close();
-  controller.abort();
-});
-
-Deno.test("Session throws SessionClosedError on 'normal' if the session has closed", async () => {
-  const controller = new AbortController();
-  const buffer: Uint8Array[] = [];
-  const reader = new Reader(buffer, controller.signal);
-  const writer = new Writer(buffer);
-  const session = new Session(reader, writer);
-  session.close();
-  await assertRejects(async () => {
-    await session.normal("<C-w>p");
-  }, SessionClosedError);
-  await session.waitClosed();
-  reader.close();
-  controller.abort();
-});
-
-Deno.test("Session throws SessionClosedError on 'expr' if the session has closed", async () => {
-  const controller = new AbortController();
-  const buffer: Uint8Array[] = [];
-  const reader = new Reader(buffer, controller.signal);
-  const writer = new Writer(buffer);
-  const session = new Session(reader, writer);
-  session.close();
-  await assertRejects(async () => {
-    await session.expr("v:version");
-  }, SessionClosedError);
-  await session.waitClosed();
-  reader.close();
-  controller.abort();
-});
-
-Deno.test("Session throws SessionClosedError on 'call' if the session has closed", async () => {
-  const controller = new AbortController();
-  const buffer: Uint8Array[] = [];
-  const reader = new Reader(buffer, controller.signal);
-  const writer = new Writer(buffer);
-  const session = new Session(reader, writer);
-  session.close();
-  await assertRejects(async () => {
-    await session.call("say");
-  }, SessionClosedError);
-  await session.waitClosed();
-  reader.close();
-  controller.abort();
-});
-
-Deno.test("Session is disposable", async () => {
-  const controller = new AbortController();
-  const s2v: Uint8Array[] = []; // Local to Remote
-  const v2s: Uint8Array[] = []; // Remote to Local
-  const sr = new Reader(v2s, controller.signal);
-  const sw = new Writer(s2v);
-  const session = new Session(sr, sw);
-  const vr = new Reader(s2v, controller.signal);
-  const vw = new Writer(v2s);
-  const vim = new Vim(vr, vw, {
-    async call(data) {
-      const [_, fn, args, msgid] = data;
-      assertEquals(fn, "say");
-      assertEquals(args, ["John Titor"]);
-      assertEquals(msgid, 0);
-      await this.send([msgid, `Hello ${args[0]} from Remote`]);
+      const waiter = session.wait();
+      await assertRejects(
+        () => deadline(waiter, 100),
+        DeadlineError,
+      );
+      guard.resolve();
+      await deadline(waiter, 100);
     },
-  });
-  await using(session, async (session) => {
-    // Session is not closed
-    assertEquals(
-      await session.call("say", "John Titor"),
-      "Hello John Titor from Remote",
-    );
-  });
-  // Session is closed by `dispose`
-  await assertRejects(async () => {
-    await session.call("say", "John Titor");
-  }, SessionClosedError);
-  // Close
-  sr.close();
-  vr.close();
-  await Promise.all([
-    session.waitClosed(),
-    vim.waitClosed(),
-  ]);
-  controller.abort();
+  );
+});
+
+Deno.test("Session.shutdown", async (t) => {
+  await t.step(
+    "throws an error if the session is not started",
+    () => {
+      const { session } = createDummySession();
+
+      assertThrows(() => session.shutdown(), Error, "Session is not running");
+    },
+  );
+
+  await t.step(
+    "unlocks specified reader and writer",
+    async () => {
+      const { session, input, output } = createDummySession();
+
+      session.start();
+      await session.shutdown();
+      assert(!input.reader.locked, "reader is locked");
+      assert(!output.writer.locked, "writer is locked");
+    },
+  );
+
+  await t.step(
+    "waits until all messages are processed to the writer",
+    async () => {
+      const input = channel<Uint8Array>();
+      const guard = deferred();
+      const session = new Session(
+        input.reader,
+        // Writer that is not processed until the guard is resolved
+        new WritableStream({
+          async write() {
+            await guard;
+          },
+        }),
+      );
+
+      session.start();
+      session.send(["redraw", ""]);
+      const shutdown = session.shutdown();
+      await assertRejects(
+        () => deadline(shutdown, 100),
+        DeadlineError,
+      );
+      // Process all messages
+      guard.resolve();
+      await deadline(shutdown, 100);
+    },
+  );
+});
+
+Deno.test("Session.forceShutdown", async (t) => {
+  await t.step(
+    "throws an error if the session is not started",
+    () => {
+      const { session } = createDummySession();
+
+      assertThrows(
+        () => session.forceShutdown(),
+        Error,
+        "Session is not running",
+      );
+    },
+  );
+
+  await t.step(
+    "unlocks specified reader and writer",
+    async () => {
+      const { session, input, output } = createDummySession();
+
+      session.start();
+      await session.forceShutdown();
+      assert(!input.reader.locked, "reader is locked");
+      assert(!output.writer.locked, "writer is locked");
+    },
+  );
+
+  await t.step(
+    "does not wait until all messages are processed to the writer",
+    async () => {
+      const input = channel<Uint8Array>();
+      const guard = deferred();
+      const session = new Session(
+        input.reader,
+        // Writer that is not processed until the guard is resolved
+        new WritableStream({
+          async write() {
+            await guard;
+          },
+        }),
+      );
+
+      session.start();
+      session.send(["redraw", ""]);
+      const shutdown = session.forceShutdown();
+      await deadline(shutdown, 100);
+    },
+  );
 });
