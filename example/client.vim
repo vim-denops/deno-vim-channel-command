@@ -2,23 +2,21 @@ let s:root = expand('<sfile>:h')
 let s:server = join([s:root, 'server.ts'], has('win32') ? '\' : '/')
 
 function! s:start_server() abort
-  let job = job_start(['deno', 'run', '-A', '--unstable', s:server], {
+  call job_start(['deno', 'run', '-A', '--unstable', s:server], {
         \ 'mode': 'json',
+        \ 'err_mode': 'nl',
         \ 'err_cb': funcref('s:err_cb'),
-        \ 'exit_cb': funcref('s:exit_cb'),
         \ 'env': {
         \   'NO_COLOR': 1,
-        \ }
+        \ },
+        \ 'noblock': 1,
+        \ 'pty': 0,
         \})
+  echomsg 'Server is started'
 endfunction
 
-function! s:err_cb(ch, msg) abort
-  echomsg a:msg
+function! s:err_cb(ch, msg, ...) abort
+  echomsg "Recv:" .. a:msg
 endfunction
 
-function! s:exit_cb(ch, status) abort
-  echomsg printf('Server is closed: %d', a:status)
-endfunction
-
-
-command! StartServer call s:start_server()
+call s:start_server()
