@@ -37,7 +37,7 @@ export function buildExprCommand(expr: string, msgid?: number): ExprCommand {
 export function buildCallCommand(
   fn: string,
   args: unknown[],
-  msgid?: number
+  msgid?: number,
 ): CallCommand {
   if (msgid != null && msgid >= 0) {
     throw new Error("msgid must be a negative number for command");

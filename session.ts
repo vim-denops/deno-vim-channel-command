@@ -10,10 +10,44 @@ import { isMessage, Message } from "./message.ts";
 const shutdown = Symbol("shutdown");
 
 export type SessionOptions = {
+  /**
+   * The callback function to be called when an invalid message is received.
+   * The default behavior is to ignore the message.
+   * @param {unknown} message The invalid message.
+   */
   onInvalidMessage?: (message: unknown) => void;
+
+  /**
+   * The callback function to be called when a message is received.
+   * The default behavior is to ignore the message.
+   * @param {Message} message The received message.
+   */
   onMessage?: (message: Message) => void;
 };
 
+/**
+ * Session is a wrapper of ReadableStream and WritableStream to send commands and receive messages.
+ *
+ * @example
+ * ```ts
+ * import { Session } from "./mod.ts";
+ *
+ * const session = new Session(
+ *   Deno.stdin.readable,
+ *   Deno.stdout.writable,
+ *   {
+ *     onMessage: (message) => {
+ *       console.log("Recv:", message);
+ *     },
+ *   }
+ * );
+ * session.start();
+ *
+ * // ...
+ *
+ * await session.shutdown();
+ * ```
+ */
 export class Session {
   #outer: Channel<Uint8Array>;
   #inner: Channel<Command | Message>;
@@ -25,9 +59,26 @@ export class Session {
     waiter: Promise<void>;
   };
 
+  /**
+   * The callback function to be called when an invalid message is received.
+   * The default behavior is to ignore the message.
+   * @param {unknown} message The invalid message.
+   */
   onInvalidMessage?: (message: unknown) => void;
+
+  /**
+   * The callback function to be called when a message is received.
+   * The default behavior is to ignore the message.
+   * @param {Message} message The received message.
+   */
   onMessage?: (message: Message) => void;
 
+  /**
+   * Constructs a new session.
+   * @param {ReadableStream<Uint8Array>} reader The reader to read raw data.
+   * @param {WritableStream<Uint8Array>} writer The writer to write raw data.
+   * @param {SessionOptions} options The options for the session.
+   */
   constructor(
     reader: ReadableStream<Uint8Array>,
     writer: WritableStream<Uint8Array>,
@@ -43,6 +94,11 @@ export class Session {
     this.#inner = channel();
   }
 
+  /**
+   * Send a command or a message to the peer.
+   * @param {Command | Message} data The data to send.
+   * @throws {Error} If the session is not running.
+   */
   send(data: Command | Message): void {
     if (!this.#running) {
       throw new Error("Session is not running");
@@ -51,6 +107,13 @@ export class Session {
     innerWriter.write(data);
   }
 
+  /**
+   * Receive a message from the peer.
+   * @param {number} msgid The message ID to receive.
+   * @returns {Promise<Message>} The received message.
+   * @throws {Error} If the session is not running.
+   * @throws {Error} If the message ID is already reserved.
+   */
   recv(msgid: number): Promise<Message> {
     if (!this.#running) {
       throw new Error("Session is not running");
@@ -59,6 +122,16 @@ export class Session {
     return reservator.reserve(msgid);
   }
 
+  /**
+   * Start the session.
+   *
+   * This method must be called before calling `send` or `recv`.
+   * If the session is already running, this method throws an error.
+   *
+   * The session is started in the following steps:
+   * @param {object} options The options for the session.
+   * @throws {Error} If the session is already running.
+   */
   start(options: { signal?: AbortSignal } = {}): void {
     if (this.#running) {
       throw new Error("Session is already running");
@@ -120,6 +193,11 @@ export class Session {
     };
   }
 
+  /**
+   * Wait until the session is shutdown.
+   * @returns {Promise<void>} A promise that is fulfilled when the session is shutdown.
+   * @throws {Error} If the session is not running.
+   */
   wait(): Promise<void> {
     if (!this.#running) {
       throw new Error("Session is not running");
@@ -128,6 +206,11 @@ export class Session {
     return waiter;
   }
 
+  /**
+   * Shutdown the session.
+   * @returns {Promise<void>} A promise that is fulfilled when the session is shutdown.
+   * @throws {Error} If the session is not running.
+   */
   shutdown(): Promise<void> {
     if (!this.#running) {
       throw new Error("Session is not running");
@@ -138,6 +221,11 @@ export class Session {
     return waiter;
   }
 
+  /**
+   * Shutdown the session forcibly.
+   * @returns {Promise<void>} A promise that is fulfilled when the session is shutdown.
+   * @throws {Error} If the session is not running.
+   */
   forceShutdown(): Promise<void> {
     if (!this.#running) {
       throw new Error("Session is not running");
