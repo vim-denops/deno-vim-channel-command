@@ -104,10 +104,9 @@ export class Session {
    * If the session is already running, this method throws an error.
    *
    * The session is started in the following steps:
-   * @param {object} options The options for the session.
    * @throws {Error} If the session is already running.
    */
-  start(options: { signal?: AbortSignal } = {}): void {
+  start(): void {
     if (this.#running) {
       throw new Error("Session is already running");
     }
@@ -115,16 +114,6 @@ export class Session {
     const innerWriter = this.#inner.writer.getWriter();
     const consumerController = new AbortController();
     const producerController = new AbortController();
-
-    const abort = (reason: unknown) => {
-      if (this.#running) {
-        const { consumerController, producerController } = this.#running;
-        consumerController.abort(reason);
-        producerController.abort(reason);
-      }
-    };
-    const { signal } = options;
-    signal?.addEventListener("abort", abort);
 
     const ignoreShutdownError = (err: unknown) => {
       if (err === shutdown) {
@@ -154,7 +143,6 @@ export class Session {
 
     const waiter = Promise.all([consumer, producer])
       .then(() => {}).finally(() => {
-        signal?.removeEventListener("abort", abort);
         innerWriter.releaseLock();
         this.#running = undefined;
       });
