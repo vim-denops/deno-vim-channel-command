@@ -21,7 +21,6 @@ type Session = {
  *
  * @example
  * ```ts
- * import { assertNumber } from "https://deno.land/x/unknownutil/mod.ts";
  * import { channel } from "https://deno.land/x/streamtools/mod.ts";
  * import { Session, Client } from "./mod.ts";
  *
