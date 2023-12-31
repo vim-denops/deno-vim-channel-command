@@ -2,7 +2,7 @@ import { Reservator } from "https://deno.land/x/reservator@v0.1.0/mod.ts";
 import {
   Channel,
   channel,
-} from "https://deno.land/x/streamtools@v0.4.1/mod.ts";
+} from "https://deno.land/x/streamtools@v0.5.0/mod.ts";
 import { DecodeStream, EncodeStream } from "./json_streams.ts";
 import { Command } from "./command.ts";
 import { isMessage, Message } from "./message.ts";
@@ -44,22 +44,21 @@ export class Session {
   /**
    * The callback function to be called when an invalid message is received.
    * The default behavior is to ignore the message.
-   * @param {unknown} message The invalid message.
+   * @param message The invalid message.
    */
   onInvalidMessage?: (message: unknown) => void;
 
   /**
    * The callback function to be called when a message is received.
    * The default behavior is to ignore the message.
-   * @param {Message} message The received message.
+   * @param message The received message.
    */
   onMessage?: (message: Message) => void;
 
   /**
    * Constructs a new session.
-   * @param {ReadableStream<Uint8Array>} reader The reader to read raw data.
-   * @param {WritableStream<Uint8Array>} writer The writer to write raw data.
-   * @param {SessionOptions} options The options for the session.
+   * @param reader The reader to read raw data.
+   * @param writer The writer to write raw data.
    */
   constructor(
     reader: ReadableStream<Uint8Array>,
@@ -71,23 +70,23 @@ export class Session {
 
   /**
    * Send a command or a message to the peer.
-   * @param {Command | Message} data The data to send.
-   * @throws {Error} If the session is not running.
+   * @param data The data to send.
+   * @throws If the session is not running.
    */
-  send(data: Command | Message): void {
+  send(data: Command | Message): Promise<void> {
     if (!this.#running) {
       throw new Error("Session is not running");
     }
     const { innerWriter } = this.#running;
-    innerWriter.write(data);
+    return innerWriter.write(data);
   }
 
   /**
    * Receive a message from the peer.
-   * @param {number} msgid The message ID to receive.
-   * @returns {Promise<Message>} The received message.
-   * @throws {Error} If the session is not running.
-   * @throws {Error} If the message ID is already reserved.
+   * @param msgid The message ID to receive.
+   * @returns The received message.
+   * @throws If the session is not running.
+   * @throws If the message ID is already reserved.
    */
   recv(msgid: number): Promise<Message> {
     if (!this.#running) {
@@ -104,7 +103,7 @@ export class Session {
    * If the session is already running, this method throws an error.
    *
    * The session is started in the following steps:
-   * @throws {Error} If the session is already running.
+   * @throws If the session is already running.
    */
   start(): void {
     if (this.#running) {
@@ -158,8 +157,8 @@ export class Session {
 
   /**
    * Wait until the session is shutdown.
-   * @returns {Promise<void>} A promise that is fulfilled when the session is shutdown.
-   * @throws {Error} If the session is not running.
+   * @returns A promise that is fulfilled when the session is shutdown.
+   * @throws If the session is not running.
    */
   wait(): Promise<void> {
     if (!this.#running) {
@@ -171,8 +170,8 @@ export class Session {
 
   /**
    * Shutdown the session.
-   * @returns {Promise<void>} A promise that is fulfilled when the session is shutdown.
-   * @throws {Error} If the session is not running.
+   * @returns A promise that is fulfilled when the session is shutdown.
+   * @throws If the session is not running.
    */
   shutdown(): Promise<void> {
     if (!this.#running) {
@@ -186,8 +185,8 @@ export class Session {
 
   /**
    * Shutdown the session forcibly.
-   * @returns {Promise<void>} A promise that is fulfilled when the session is shutdown.
-   * @throws {Error} If the session is not running.
+   * @returns A promise that is fulfilled when the session is shutdown.
+   * @throws If the session is not running.
    */
   forceShutdown(): Promise<void> {
     if (!this.#running) {

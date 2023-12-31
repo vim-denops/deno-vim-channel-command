@@ -4,18 +4,18 @@ import {
   AssertionError,
   assertRejects,
   assertThrows,
-} from "https://deno.land/std@0.186.0/testing/asserts.ts";
+} from "https://deno.land/std@0.210.0/assert/mod.ts";
 import {
   deadline,
   DeadlineError,
-  deferred,
-} from "https://deno.land/std@0.186.0/async/mod.ts";
+} from "https://deno.land/std@0.210.0/async/mod.ts";
+import { deferred } from "https://deno.land/std@0.208.0/async/mod.ts#=";
 import {
   Channel,
   channel,
   pop,
   push,
-} from "https://deno.land/x/streamtools@v0.4.1/mod.ts";
+} from "https://deno.land/x/streamtools@v0.5.0/mod.ts";
 import { buildRedrawCommand } from "./command.ts";
 import { buildMessage, Message } from "./message.ts";
 import { Session } from "./session.ts";
@@ -64,7 +64,7 @@ Deno.test("Session.send", async (t) => {
       session.start();
 
       const command = buildRedrawCommand();
-      session.send(command);
+      await session.send(command);
       assertEquals(
         JSON.parse(decoder.decode(ensureNotNull(await pop(output.reader)))),
         command,
@@ -80,7 +80,7 @@ Deno.test("Session.send", async (t) => {
       session.start();
 
       const message = buildMessage(0, "Hello");
-      session.send(message);
+      await session.send(message);
       assertEquals(
         JSON.parse(decoder.decode(ensureNotNull(await pop(output.reader)))),
         message,
@@ -232,7 +232,7 @@ Deno.test("Session.shutdown", async (t) => {
       );
 
       session.start();
-      session.send(["redraw", ""]);
+      await session.send(["redraw", ""]);
       const shutdown = session.shutdown();
       await assertRejects(
         () => deadline(shutdown, 100),
@@ -287,7 +287,7 @@ Deno.test("Session.forceShutdown", async (t) => {
       );
 
       session.start();
-      session.send(["redraw", ""]);
+      session.send(["redraw", ""]); // Do NOT await
       const shutdown = session.forceShutdown();
       await deadline(shutdown, 100);
     },

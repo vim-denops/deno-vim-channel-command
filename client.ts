@@ -12,7 +12,7 @@ import {
 const msgidThreshold = 2 ** 32;
 
 type Session = {
-  send: (data: Command | Message) => void;
+  send: (data: Command | Message) => Promise<void>;
   recv: (msgid: number) => Promise<Message>;
 };
 
@@ -21,7 +21,6 @@ type Session = {
  *
  * @example
  * ```ts
- * import { assertNumber } from "https://deno.land/x/unknownutil/mod.ts";
  * import { channel } from "https://deno.land/x/streamtools/mod.ts";
  * import { Session, Client } from "./mod.ts";
  *
@@ -50,8 +49,8 @@ export class Client {
    * Note that the indexer must be unique for each session to avoid message ID conflicts.
    * If multiple clients are created for a single session, specify a single indexer.
    *
-   * @param {Session} session The session to communicate with.
-   * @param {Indexer} indexer The indexer to generate message IDs.
+   * @param session The session to communicate with.
+   * @param indexer The indexer to generate message IDs.
    */
   constructor(session: Session, indexer?: Indexer) {
     this.#session = session;
@@ -72,89 +71,95 @@ export class Client {
   /**
    * Sends a message to Vim.
    *
-   * @param {number} msgid The message ID.
-   * @param {unknown} value The value to send.
+   * @param msgid The message ID.
+   * @param value The value to send.
    */
-  reply(msgid: number, value: unknown): void {
+  reply(msgid: number, value: unknown): Promise<void> {
     const message = buildMessage(msgid, value);
-    this.#session.send(message);
+    return this.#session.send(message);
   }
 
   /**
    * Sends a redraw command to Vim.
    *
-   * @param {boolean} force Whether to force redraw.
+   * @param force Whether to force redraw.
    */
-  redraw(force = false): void {
+  redraw(force = false): Promise<void> {
     const command = buildRedrawCommand(force);
-    this.#session.send(command);
+    return this.#session.send(command);
   }
 
   /**
    * Sends an ex command to Vim.
    *
-   * @param {string} expr The expression to evaluate.
+   * @param expr The expression to evaluate.
    */
-  ex(expr: string): void {
+  ex(expr: string): Promise<void> {
     const command = buildExCommand(expr);
-    this.#session.send(command);
+    return this.#session.send(command);
   }
 
   /**
    * Sends a normal command to Vim.
    *
-   * @param {string} expr The expression to evaluate.
+   * @param expr The expression to evaluate.
    */
-  normal(expr: string): void {
+  normal(expr: string): Promise<void> {
     const command = buildNormalCommand(expr);
-    this.#session.send(command);
+    return this.#session.send(command);
   }
 
   /**
    * Sends an expr command to Vim and wait for the result.
    *
-   * @param {string} expr The expression to evaluate.
-   * @returns {Promise<unknown>} The result of the expression.
+   * @param expr The expression to evaluate.
+   * @returns The result of the expression.
    */
-  expr(expr: string): Promise<unknown> {
+  async expr(expr: string): Promise<unknown> {
     const msgid = this.#nextMsgid();
     const command = buildExprCommand(expr, msgid);
-    this.#session.send(command);
-    return this.#recv(msgid);
+    const [ret, _] = await Promise.all([
+      this.#recv(msgid),
+      this.#session.send(command),
+    ]);
+    return ret;
   }
 
   /**
    * Sends an expr command to Vim.
    *
-   * @param {string} expr The expression to evaluate.
+   * @param expr The expression to evaluate.
    */
-  exprNoReply(expr: string): void {
+  exprNoReply(expr: string): Promise<void> {
     const command = buildExprCommand(expr);
-    this.#session.send(command);
+    return this.#session.send(command);
   }
 
   /**
    * Sends a call command to Vim and wait for the result.
    *
-   * @param {string} fn The function name to call.
-   * @param {unknown[]} args The arguments to pass to the function.
-   * @returns {Promise<unknown>} The result of the function.
+   * @param fn The function name to call.
+   * @param args The arguments to pass to the function.
+   * @returns The result of the function.
    */
-  call(fn: string, ...args: unknown[]): Promise<unknown> {
+  async call(fn: string, ...args: unknown[]): Promise<unknown> {
     const msgid = this.#nextMsgid();
     const command = buildCallCommand(fn, args, msgid);
-    this.#session.send(command);
-    return this.#recv(msgid);
+    const [ret, _] = await Promise.all([
+      this.#recv(msgid),
+      this.#session.send(command),
+    ]);
+    return ret;
   }
 
   /**
    * Sends a call command to Vim.
    *
-   * @param {string} fn The function name to call.
-   * @param {unknown[]} args The arguments to pass to the function.
+   * @param fn The function name to call.
+   * @param args The arguments to pass to the function.
    */
-  callNoReply(fn: string, ...args: unknown[]): void {
+  callNoReply(fn: string, ...args: unknown[]): Promise<void> {
     const command = buildCallCommand(fn, args);
-    this.#session.send(command);
+    return this.#session.send(command);
   }
 }

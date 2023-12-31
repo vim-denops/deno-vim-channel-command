@@ -1,7 +1,7 @@
 import {
   assertEquals,
   assertThrows,
-} from "https://deno.land/std@0.186.0/testing/asserts.ts";
+} from "https://deno.land/std@0.210.0/assert/mod.ts";
 import {
   buildCallCommand,
   buildExCommand,
