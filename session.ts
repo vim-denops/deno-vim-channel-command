@@ -2,7 +2,7 @@ import { Reservator } from "https://deno.land/x/reservator@v0.1.0/mod.ts";
 import {
   Channel,
   channel,
-} from "https://deno.land/x/streamtools@v0.4.1/mod.ts";
+} from "https://deno.land/x/streamtools@v0.5.0/mod.ts";
 import { DecodeStream, EncodeStream } from "./json_streams.ts";
 import { Command } from "./command.ts";
 import { isMessage, Message } from "./message.ts";

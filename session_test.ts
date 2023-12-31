@@ -4,18 +4,18 @@ import {
   AssertionError,
   assertRejects,
   assertThrows,
-} from "https://deno.land/std@0.186.0/testing/asserts.ts";
+} from "https://deno.land/std@0.210.0/assert/mod.ts";
 import {
   deadline,
   DeadlineError,
-  deferred,
-} from "https://deno.land/std@0.186.0/async/mod.ts";
+} from "https://deno.land/std@0.210.0/async/mod.ts";
+import { deferred } from "https://deno.land/std@0.208.0/async/mod.ts#=";
 import {
   Channel,
   channel,
   pop,
   push,
-} from "https://deno.land/x/streamtools@v0.4.1/mod.ts";
+} from "https://deno.land/x/streamtools@v0.5.0/mod.ts";
 import { buildRedrawCommand } from "./command.ts";
 import { buildMessage, Message } from "./message.ts";
 import { Session } from "./session.ts";
