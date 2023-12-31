@@ -12,7 +12,7 @@ import {
 const msgidThreshold = 2 ** 32;
 
 type Session = {
-  send: (data: Command | Message) => void;
+  send: (data: Command | Message) => Promise<void>;
   recv: (msgid: number) => Promise<Message>;
 };
 
@@ -74,9 +74,9 @@ export class Client {
    * @param msgid The message ID.
    * @param value The value to send.
    */
-  reply(msgid: number, value: unknown): void {
+  reply(msgid: number, value: unknown): Promise<void> {
     const message = buildMessage(msgid, value);
-    this.#session.send(message);
+    return this.#session.send(message);
   }
 
   /**
@@ -84,9 +84,9 @@ export class Client {
    *
    * @param force Whether to force redraw.
    */
-  redraw(force = false): void {
+  redraw(force = false): Promise<void> {
     const command = buildRedrawCommand(force);
-    this.#session.send(command);
+    return this.#session.send(command);
   }
 
   /**
@@ -94,9 +94,9 @@ export class Client {
    *
    * @param expr The expression to evaluate.
    */
-  ex(expr: string): void {
+  ex(expr: string): Promise<void> {
     const command = buildExCommand(expr);
-    this.#session.send(command);
+    return this.#session.send(command);
   }
 
   /**
@@ -104,9 +104,9 @@ export class Client {
    *
    * @param expr The expression to evaluate.
    */
-  normal(expr: string): void {
+  normal(expr: string): Promise<void> {
     const command = buildNormalCommand(expr);
-    this.#session.send(command);
+    return this.#session.send(command);
   }
 
   /**
@@ -115,11 +115,14 @@ export class Client {
    * @param expr The expression to evaluate.
    * @returns The result of the expression.
    */
-  expr(expr: string): Promise<unknown> {
+  async expr(expr: string): Promise<unknown> {
     const msgid = this.#nextMsgid();
     const command = buildExprCommand(expr, msgid);
-    this.#session.send(command);
-    return this.#recv(msgid);
+    const [ret, _] = await Promise.all([
+      this.#recv(msgid),
+      this.#session.send(command),
+    ]);
+    return ret;
   }
 
   /**
@@ -127,9 +130,9 @@ export class Client {
    *
    * @param expr The expression to evaluate.
    */
-  exprNoReply(expr: string): void {
+  exprNoReply(expr: string): Promise<void> {
     const command = buildExprCommand(expr);
-    this.#session.send(command);
+    return this.#session.send(command);
   }
 
   /**
@@ -139,11 +142,14 @@ export class Client {
    * @param args The arguments to pass to the function.
    * @returns The result of the function.
    */
-  call(fn: string, ...args: unknown[]): Promise<unknown> {
+  async call(fn: string, ...args: unknown[]): Promise<unknown> {
     const msgid = this.#nextMsgid();
     const command = buildCallCommand(fn, args, msgid);
-    this.#session.send(command);
-    return this.#recv(msgid);
+    const [ret, _] = await Promise.all([
+      this.#recv(msgid),
+      this.#session.send(command),
+    ]);
+    return ret;
   }
 
   /**
@@ -152,8 +158,8 @@ export class Client {
    * @param fn The function name to call.
    * @param args The arguments to pass to the function.
    */
-  callNoReply(fn: string, ...args: unknown[]): void {
+  callNoReply(fn: string, ...args: unknown[]): Promise<void> {
     const command = buildCallCommand(fn, args);
-    this.#session.send(command);
+    return this.#session.send(command);
   }
 }

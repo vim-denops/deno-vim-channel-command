@@ -73,12 +73,12 @@ export class Session {
    * @param data The data to send.
    * @throws If the session is not running.
    */
-  send(data: Command | Message): void {
+  send(data: Command | Message): Promise<void> {
     if (!this.#running) {
       throw new Error("Session is not running");
     }
     const { innerWriter } = this.#running;
-    innerWriter.write(data);
+    return innerWriter.write(data);
   }
 
   /**

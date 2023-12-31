@@ -7,19 +7,20 @@ import { buildMessage } from "./message.ts";
 import { Client } from "./client.ts";
 
 Deno.test("Client.reply", async (t) => {
-  await t.step("sends a message", () => {
+  await t.step("sends a message", async () => {
     const receives: unknown[] = [];
     const session = {
       send: (message: unknown) => {
         receives.push(message);
+        return Promise.resolve();
       },
       recv: () => {
         throw new Error("should not be called");
       },
     };
     const client = new Client(session);
-    client.reply(1, "Hello");
-    client.reply(2, "World");
+    await client.reply(1, "Hello");
+    await client.reply(2, "World");
     assertEquals(receives, [
       [1, "Hello"],
       [2, "World"],
@@ -41,19 +42,20 @@ Deno.test("Client.reply", async (t) => {
 });
 
 Deno.test("Client.redraw", async (t) => {
-  await t.step("sends a redraw command", () => {
+  await t.step("sends a redraw command", async () => {
     const receives: unknown[] = [];
     const session = {
       send: (message: unknown) => {
         receives.push(message);
+        return Promise.resolve();
       },
       recv: () => {
         throw new Error("should not be called");
       },
     };
     const client = new Client(session);
-    client.redraw();
-    client.redraw(true);
+    await client.redraw();
+    await client.redraw(true);
     assertEquals(receives, [
       ["redraw", ""],
       ["redraw", "force"],
@@ -75,18 +77,19 @@ Deno.test("Client.redraw", async (t) => {
 });
 
 Deno.test("Client.ex", async (t) => {
-  await t.step("sends a ex command", () => {
+  await t.step("sends a ex command", async () => {
     const receives: unknown[] = [];
     const session = {
       send: (message: unknown) => {
         receives.push(message);
+        return Promise.resolve();
       },
       recv: () => {
         throw new Error("should not be called");
       },
     };
     const client = new Client(session);
-    client.ex("echo 'Hello'");
+    await client.ex("echo 'Hello'");
     assertEquals(receives, [
       ["ex", "echo 'Hello'"],
     ]);
@@ -107,18 +110,19 @@ Deno.test("Client.ex", async (t) => {
 });
 
 Deno.test("Client.normal", async (t) => {
-  await t.step("sends a normal command", () => {
+  await t.step("sends a normal command", async () => {
     const receives: unknown[] = [];
     const session = {
       send: (message: unknown) => {
         receives.push(message);
+        return Promise.resolve();
       },
       recv: () => {
         throw new Error("should not be called");
       },
     };
     const client = new Client(session);
-    client.normal("zO");
+    await client.normal("zO");
     assertEquals(receives, [
       ["normal", "zO"],
     ]);
@@ -144,6 +148,7 @@ Deno.test("Client.expr", async (t) => {
     const session = {
       send: (message: unknown) => {
         receives.push(message);
+        return Promise.resolve();
       },
       recv: (msgid: number) =>
         Promise.resolve(buildMessage(msgid, `response:${msgid}`)),
@@ -163,7 +168,7 @@ Deno.test("Client.expr", async (t) => {
     ]);
   });
 
-  await t.step("throws an error when send fails", () => {
+  await t.step("rejects with an error when send fails", async () => {
     const session = {
       send: () => {
         throw new Error("send error");
@@ -172,7 +177,7 @@ Deno.test("Client.expr", async (t) => {
         Promise.resolve(buildMessage(msgid, `response:${msgid}`)),
     };
     const client = new Client(session);
-    assertThrows(
+    await assertRejects(
       () => client.expr("g:vim_deno_channel_command"),
       Error,
       "send error",
@@ -183,6 +188,7 @@ Deno.test("Client.expr", async (t) => {
     const session = {
       send: () => {
         // Do NOTHING
+        return Promise.resolve();
       },
       recv: () => {
         throw new Error("recv error");
@@ -198,18 +204,19 @@ Deno.test("Client.expr", async (t) => {
 });
 
 Deno.test("Client.exprNoReply", async (t) => {
-  await t.step("sends a expr command", () => {
+  await t.step("sends a expr command", async () => {
     const receives: unknown[] = [];
     const session = {
       send: (message: unknown) => {
         receives.push(message);
+        return Promise.resolve();
       },
       recv: () => {
         throw new Error("should not be called");
       },
     };
     const client = new Client(session);
-    client.exprNoReply("g:vim_deno_channel_command");
+    await client.exprNoReply("g:vim_deno_channel_command");
     assertEquals(receives, [
       ["expr", "g:vim_deno_channel_command"],
     ]);
@@ -239,6 +246,7 @@ Deno.test("Client.call", async (t) => {
     const session = {
       send: (message: unknown) => {
         receives.push(message);
+        return Promise.resolve();
       },
       recv: (msgid: number) =>
         Promise.resolve(buildMessage(msgid, `response:${msgid}`)),
@@ -252,7 +260,7 @@ Deno.test("Client.call", async (t) => {
     ]);
   });
 
-  await t.step("throws an error when send fails", () => {
+  await t.step("rejects with an error when send fails", async () => {
     const session = {
       send: () => {
         throw new Error("send error");
@@ -261,7 +269,7 @@ Deno.test("Client.call", async (t) => {
         Promise.resolve(buildMessage(msgid, `response:${msgid}`)),
     };
     const client = new Client(session);
-    assertThrows(
+    await assertRejects(
       () => client.call("foo", "bar"),
       Error,
       "send error",
@@ -272,6 +280,7 @@ Deno.test("Client.call", async (t) => {
     const session = {
       send: () => {
         // Do NOTHING
+        return Promise.resolve();
       },
       recv: () => {
         throw new Error("recv error");
@@ -287,18 +296,19 @@ Deno.test("Client.call", async (t) => {
 });
 
 Deno.test("Client.callNoReply", async (t) => {
-  await t.step("sends a call command", () => {
+  await t.step("sends a call command", async () => {
     const receives: unknown[] = [];
     const session = {
       send: (message: unknown) => {
         receives.push(message);
+        return Promise.resolve();
       },
       recv: () => {
         throw new Error("should not be called");
       },
     };
     const client = new Client(session);
-    client.callNoReply("foo", "bar");
+    await client.callNoReply("foo", "bar");
     assertEquals(receives, [
       ["call", "foo", ["bar"]],
     ]);
