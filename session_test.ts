@@ -48,7 +48,7 @@ Deno.test("Session.send", async (t) => {
       const { session } = createDummySession();
 
       const command = buildRedrawCommand();
-      assertThrows(
+      assertRejects(
         () => session.send(command),
         Error,
         "Session is not running",
@@ -95,7 +95,7 @@ Deno.test("Session.recv", async (t) => {
     () => {
       const { session } = createDummySession();
 
-      assertThrows(() => session.recv(-1), Error, "Session is not running");
+      assertRejects(() => session.recv(-1), Error, "Session is not running");
     },
   );
 
@@ -161,7 +161,7 @@ Deno.test("Session.wait", async (t) => {
     () => {
       const { session } = createDummySession();
 
-      assertThrows(() => session.wait(), Error, "Session is not running");
+      assertRejects(() => session.wait(), Error, "Session is not running");
     },
   );
 
@@ -200,7 +200,7 @@ Deno.test("Session.shutdown", async (t) => {
     () => {
       const { session } = createDummySession();
 
-      assertThrows(() => session.shutdown(), Error, "Session is not running");
+      assertRejects(() => session.shutdown(), Error, "Session is not running");
     },
   );
 
@@ -251,7 +251,7 @@ Deno.test("Session.forceShutdown", async (t) => {
     () => {
       const { session } = createDummySession();
 
-      assertThrows(
+      assertRejects(
         () => session.forceShutdown(),
         Error,
         "Session is not running",

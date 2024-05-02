@@ -70,12 +70,12 @@ export class Session {
 
   /**
    * Send a command or a message to the peer.
+   * If the session is not running, the promise will be rejected with {@link Error}.
    * @param data The data to send.
-   * @throws If the session is not running.
    */
   send(data: Command | Message): Promise<void> {
     if (!this.#running) {
-      throw new Error("Session is not running");
+      return Promise.reject(new Error("Session is not running"));
     }
     const { innerWriter } = this.#running;
     return innerWriter.write(data);
@@ -83,14 +83,13 @@ export class Session {
 
   /**
    * Receive a message from the peer.
+   * If the session is not running or the message ID is already reserved, the promise will be rejected with {@link Error}.
    * @param msgid The message ID to receive.
    * @returns The received message.
-   * @throws If the session is not running.
-   * @throws If the message ID is already reserved.
    */
   recv(msgid: number): Promise<Message> {
     if (!this.#running) {
-      throw new Error("Session is not running");
+      return Promise.reject(new Error("Session is not running"));
     }
     const { reservator } = this.#running;
     return reservator.reserve(msgid);
@@ -157,12 +156,12 @@ export class Session {
 
   /**
    * Wait until the session is shutdown.
+   * If the session is not running, the promise will be rejected with {@link Error}.
    * @returns A promise that is fulfilled when the session is shutdown.
-   * @throws If the session is not running.
    */
   wait(): Promise<void> {
     if (!this.#running) {
-      throw new Error("Session is not running");
+      return Promise.reject(new Error("Session is not running"));
     }
     const { waiter } = this.#running;
     return waiter;
@@ -170,12 +169,12 @@ export class Session {
 
   /**
    * Shutdown the session.
+   * If the session is not running, the promise will be rejected with {@link Error}.
    * @returns A promise that is fulfilled when the session is shutdown.
-   * @throws If the session is not running.
    */
   shutdown(): Promise<void> {
     if (!this.#running) {
-      throw new Error("Session is not running");
+      return Promise.reject(new Error("Session is not running"));
     }
     // Abort consumer to shutdown session properly.
     const { consumerController, waiter } = this.#running;
@@ -185,12 +184,12 @@ export class Session {
 
   /**
    * Shutdown the session forcibly.
+   * If the session is not running, the promise will be rejected with {@link Error}.
    * @returns A promise that is fulfilled when the session is shutdown.
-   * @throws If the session is not running.
    */
   forceShutdown(): Promise<void> {
     if (!this.#running) {
-      throw new Error("Session is not running");
+      return Promise.reject(new Error("Session is not running"));
     }
     // Abort consumer and producer to shutdown session forcibly.
     const { consumerController, producerController, waiter } = this.#running;
