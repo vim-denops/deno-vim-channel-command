@@ -21,7 +21,7 @@ type Session = {
  *
  * @example
  * ```ts
- * import { channel } from "https://deno.land/x/streamtools/mod.ts";
+ * import { channel } from "https://deno.land/x/streamtools@v0.5.0/mod.ts";
  * import { Session, Client } from "./mod.ts";
  *
  * const input = channel<Uint8Array>();
