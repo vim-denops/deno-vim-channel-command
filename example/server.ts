@@ -10,28 +10,28 @@ session.start();
 const client = new Client(session);
 
 console.warn("Invoke 'ex' command to open a new buffer");
-client.ex("new");
+await client.ex("new");
 
 console.warn("Invoke 'normal' command to input 'Hello from Deno'");
-client.normal("iHello from Deno\\<Esc>");
+await client.normal("iHello from Deno");
 
 console.warn("Invoke 'redraw' command to refresh the screen");
-client.redraw();
+await client.redraw();
 
 console.warn("Invoke 'expr' command and wait for the result");
 console.warn(await client.expr("v:version"));
 
 console.warn("Invoke 'expr' command");
-client.exprNoReply("v:version");
+await client.exprNoReply("v:version");
 
 console.warn("Invoke 'call' command and wait for the result");
 console.warn(await client.call("getcwd"));
 
 console.warn("Invoke 'call' command");
-client.callNoReply("getcwd");
+await client.callNoReply("getcwd");
 
 console.warn("Invoke 'ex' command to wipeout the buffer");
-client.ex("bwipeout!");
+await client.ex("bwipeout!");
 
 await session.shutdown();
 console.warn("Session has terminated");
