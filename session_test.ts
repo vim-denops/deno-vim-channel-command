@@ -5,11 +5,7 @@ import {
   assertRejects,
   assertThrows,
 } from "https://deno.land/std@0.210.0/assert/mod.ts";
-import {
-  deadline,
-  DeadlineError,
-} from "https://deno.land/std@0.210.0/async/mod.ts";
-import { deferred } from "https://deno.land/std@0.208.0/async/mod.ts#=";
+import { promiseState } from "https://deno.land/x/async@v2.1.0/state.ts";
 import {
   Channel,
   channel,
@@ -43,12 +39,12 @@ function ensureNotNull<T>(value: T | null): T {
 
 Deno.test("Session.send", async (t) => {
   await t.step(
-    "throws an error if the session is not started",
-    () => {
+    "rejects an error if the session is not started",
+    async () => {
       const { session } = createDummySession();
 
       const command = buildRedrawCommand();
-      assertRejects(
+      await assertRejects(
         () => session.send(command),
         Error,
         "Session is not running",
@@ -91,11 +87,15 @@ Deno.test("Session.send", async (t) => {
 
 Deno.test("Session.recv", async (t) => {
   await t.step(
-    "throws an error if the session is not started",
-    () => {
+    "rejects an error if the session is not started",
+    async () => {
       const { session } = createDummySession();
 
-      assertRejects(() => session.recv(-1), Error, "Session is not running");
+      await assertRejects(
+        () => session.recv(-1),
+        Error,
+        "Session is not running",
+      );
     },
   );
 
@@ -153,15 +153,36 @@ Deno.test("Session.start", async (t) => {
       assertEquals(received, [message]);
     },
   );
+
+  await t.step(
+    "calls `onInvalidMessage` when a invalid message is received",
+    async () => {
+      const received: unknown[] = [];
+      const { session, input } = createDummySession();
+      session.onInvalidMessage = (message) => {
+        received.push(message);
+      };
+
+      session.start();
+
+      const invalidMessage = "foo";
+      await push(input.writer, encoder.encode(JSON.stringify(invalidMessage)));
+      assertEquals(received, [invalidMessage]);
+    },
+  );
 });
 
 Deno.test("Session.wait", async (t) => {
   await t.step(
-    "throws an error if the session is not started",
-    () => {
+    "rejects an error if the session is not started",
+    async () => {
       const { session } = createDummySession();
 
-      assertRejects(() => session.wait(), Error, "Session is not running");
+      await assertRejects(
+        () => session.wait(),
+        Error,
+        "Session is not running",
+      );
     },
   );
 
@@ -169,12 +190,12 @@ Deno.test("Session.wait", async (t) => {
     "returns a promise that is resolved when the session is closed (reader is closed)",
     async () => {
       const output = channel<Uint8Array>();
-      const guard = deferred();
+      const guard = Promise.withResolvers<void>();
       const session = new Session(
         // Reader that is not closed until the guard is resolved
         new ReadableStream({
           async start(controller) {
-            await guard;
+            await guard.promise;
             controller.close();
           },
         }),
@@ -184,23 +205,42 @@ Deno.test("Session.wait", async (t) => {
       session.start();
 
       const waiter = session.wait();
-      await assertRejects(
-        () => deadline(waiter, 100),
-        DeadlineError,
-      );
+      assertEquals(await promiseState(waiter), "pending");
+      // Process all messages
       guard.resolve();
-      await deadline(waiter, 100);
+      assertEquals(await promiseState(waiter), "fulfilled");
+    },
+  );
+
+  await t.step(
+    "rejects an error if invalid data is received",
+    async () => {
+      const { session, input } = createDummySession();
+
+      session.start();
+
+      const waiter = session.wait();
+      await push(input.writer, encoder.encode("[Invalid json]"));
+      await assertRejects(
+        () => waiter,
+        Error,
+        'Unexpected "I" at position "1"',
+      );
     },
   );
 });
 
 Deno.test("Session.shutdown", async (t) => {
   await t.step(
-    "throws an error if the session is not started",
-    () => {
+    "rejects an error if the session is not started",
+    async () => {
       const { session } = createDummySession();
 
-      assertRejects(() => session.shutdown(), Error, "Session is not running");
+      await assertRejects(
+        () => session.shutdown(),
+        Error,
+        "Session is not running",
+      );
     },
   );
 
@@ -220,13 +260,13 @@ Deno.test("Session.shutdown", async (t) => {
     "waits until all messages are processed to the writer",
     async () => {
       const input = channel<Uint8Array>();
-      const guard = deferred();
+      const guard = Promise.withResolvers<void>();
       const session = new Session(
         input.reader,
         // Writer that is not processed until the guard is resolved
         new WritableStream({
           async write() {
-            await guard;
+            await guard.promise;
           },
         }),
       );
@@ -234,24 +274,21 @@ Deno.test("Session.shutdown", async (t) => {
       session.start();
       await session.send(["redraw", ""]);
       const shutdown = session.shutdown();
-      await assertRejects(
-        () => deadline(shutdown, 100),
-        DeadlineError,
-      );
+      assertEquals(await promiseState(shutdown), "pending");
       // Process all messages
       guard.resolve();
-      await deadline(shutdown, 100);
+      assertEquals(await promiseState(shutdown), "fulfilled");
     },
   );
 });
 
 Deno.test("Session.forceShutdown", async (t) => {
   await t.step(
-    "throws an error if the session is not started",
-    () => {
+    "rejects an error if the session is not started",
+    async () => {
       const { session } = createDummySession();
 
-      assertRejects(
+      await assertRejects(
         () => session.forceShutdown(),
         Error,
         "Session is not running",
@@ -275,13 +312,13 @@ Deno.test("Session.forceShutdown", async (t) => {
     "does not wait until all messages are processed to the writer",
     async () => {
       const input = channel<Uint8Array>();
-      const guard = deferred();
+      const guard = Promise.withResolvers<void>();
       const session = new Session(
         input.reader,
         // Writer that is not processed until the guard is resolved
         new WritableStream({
           async write() {
-            await guard;
+            await guard.promise;
           },
         }),
       );
@@ -289,7 +326,7 @@ Deno.test("Session.forceShutdown", async (t) => {
       session.start();
       session.send(["redraw", ""]); // Do NOT await
       const shutdown = session.forceShutdown();
-      await deadline(shutdown, 100);
+      assertEquals(await promiseState(shutdown), "fulfilled");
     },
   );
 });
