@@ -12,6 +12,7 @@ import {
   pop,
   push,
 } from "https://deno.land/x/streamtools@v0.5.0/mod.ts";
+import { AlreadyReservedError } from "https://deno.land/x/reservator@v0.1.0/errors.ts";
 import { buildRedrawCommand } from "./command.ts";
 import { buildMessage, Message } from "./message.ts";
 import { Session } from "./session.ts";
@@ -95,6 +96,21 @@ Deno.test("Session.recv", async (t) => {
         () => session.recv(-1),
         Error,
         "Session is not running",
+      );
+    },
+  );
+
+  await t.step(
+    "rejects an error if the message ID is already reserved",
+    async () => {
+      const { session } = createDummySession();
+
+      session.start();
+      session.recv(-1);
+
+      await assertRejects(
+        () => session.recv(-1),
+        AlreadyReservedError,
       );
     },
   );

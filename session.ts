@@ -92,7 +92,12 @@ export class Session {
       return Promise.reject(new Error("Session is not running"));
     }
     const { reservator } = this.#running;
-    return reservator.reserve(msgid);
+    try {
+      // NOTE: It throws an error instead returns a rejected promise.
+      return reservator.reserve(msgid);
+    } catch (err) {
+      return Promise.reject(err);
+    }
   }
 
   /**
