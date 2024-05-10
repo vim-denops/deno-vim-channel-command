@@ -2,7 +2,7 @@ let s:root = expand('<sfile>:h')
 let s:server = join([s:root, 'server.ts'], has('win32') ? '\' : '/')
 
 function! s:start_server() abort
-  call job_start(['deno', 'run', '-A', '--unstable', s:server], {
+  call job_start(['deno', 'run', '-A', s:server], {
         \ 'mode': 'json',
         \ 'err_mode': 'nl',
         \ 'err_cb': funcref('s:err_cb'),
