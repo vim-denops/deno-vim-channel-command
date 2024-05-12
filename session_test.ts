@@ -4,17 +4,12 @@ import {
   AssertionError,
   assertRejects,
   assertThrows,
-} from "https://deno.land/std@0.210.0/assert/mod.ts";
-import { promiseState } from "https://deno.land/x/async@v2.1.0/state.ts";
-import {
-  Channel,
-  channel,
-  pop,
-  push,
-} from "https://deno.land/x/streamtools@v0.5.0/mod.ts";
-import { AlreadyReservedError } from "https://deno.land/x/reservator@v0.1.0/errors.ts";
+} from "@std/assert";
+import { promiseState } from "@lambdalisue/async";
+import { type Channel, channel, pop, push } from "@lambdalisue/streamtools";
+import { AlreadyReservedError } from "@lambdalisue/reservator";
 import { buildRedrawCommand } from "./command.ts";
-import { buildMessage, Message } from "./message.ts";
+import { buildMessage, type Message } from "./message.ts";
 import { Session } from "./session.ts";
 
 const encoder = new TextEncoder();

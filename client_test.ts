@@ -1,16 +1,13 @@
-import {
-  assertEquals,
-  assertRejects,
-} from "https://deno.land/std@0.210.0/assert/mod.ts";
+import { assertEquals, assertRejects } from "@std/assert";
 import {
   assertSpyCallArgs,
   assertSpyCalls,
   resolvesNext,
   spy,
   stub,
-} from "https://deno.land/std@0.224.0/testing/mock.ts";
-import { unimplemented } from "https://deno.land/x/errorutil@v0.1.1/mod.ts";
-import { Indexer } from "https://deno.land/x/indexer@v0.1.0/mod.ts";
+} from "@std/testing/mock";
+import { unimplemented } from "@lambdalisue/errorutil";
+import { Indexer } from "@lambdalisue/indexer";
 import { buildMessage, type Message } from "./message.ts";
 import { Client, type Session } from "./client.ts";
 
