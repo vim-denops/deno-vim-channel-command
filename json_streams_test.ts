@@ -1,8 +1,5 @@
-import { assertEquals } from "https://deno.land/std@0.210.0/assert/mod.ts";
-import {
-  channel,
-  collect,
-} from "https://deno.land/x/streamtools@v0.5.0/mod.ts";
+import { assertEquals } from "@std/assert";
+import { channel, collect } from "@lambdalisue/streamtools";
 import { DecodeStream, EncodeStream } from "./json_streams.ts";
 
 const encoder = new TextEncoder();

@@ -1,12 +1,12 @@
-import { Indexer } from "https://deno.land/x/indexer@v0.1.0/mod.ts";
-import { buildMessage, Message } from "./message.ts";
+import { Indexer } from "@lambdalisue/indexer";
+import { buildMessage, type Message } from "./message.ts";
 import {
   buildCallCommand,
   buildExCommand,
   buildExprCommand,
   buildNormalCommand,
   buildRedrawCommand,
-  Command,
+  type Command,
 } from "./command.ts";
 
 const msgidThreshold = 2 ** 32;
