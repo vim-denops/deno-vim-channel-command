@@ -1,4 +1,4 @@
-import { assertEquals, assertRejects } from "@std/assert";
+import { assertEquals, assertRejects, unimplemented } from "@std/assert";
 import {
   assertSpyCallArgs,
   assertSpyCalls,
@@ -6,7 +6,6 @@ import {
   spy,
   stub,
 } from "@std/testing/mock";
-import { unimplemented } from "@lambdalisue/errorutil";
 import { Indexer } from "@lambdalisue/indexer";
 import { buildMessage, type Message } from "./message.ts";
 import { Client, type Session } from "./client.ts";
