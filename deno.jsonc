@@ -1,4 +1,13 @@
 {
+  "name": "@denops/vim-channel-command",
+  "version": "0.0.0",
+  "exports": {
+    ".": "./mod.ts",
+    "./client": "./client.ts",
+    "./command": "./command.ts",
+    "./message": "./message.ts",
+    "./session": "./session.ts"
+  },
   "tasks": {
     "check": "deno check **/*.ts",
     "test": "deno test -A --parallel --shuffle --doc",
