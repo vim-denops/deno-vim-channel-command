@@ -18,7 +18,6 @@
   },
   "imports": {
     "@lambdalisue/async": "jsr:@lambdalisue/async@^2.1.1",
-    "@lambdalisue/errorutil": "jsr:@lambdalisue/errorutil@^1.0.0",
     "@lambdalisue/indexer": "jsr:@lambdalisue/indexer@^1.0.0",
     "@lambdalisue/reservator": "jsr:@lambdalisue/reservator@^1.0.1",
     "@lambdalisue/streamtools": "jsr:@lambdalisue/streamtools@^1.0.0",
