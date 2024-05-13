@@ -11,8 +11,7 @@ import {
 
 const msgidThreshold = 2 ** 32;
 
-/** @internal */
-export type Session = {
+type Session = {
   send: (data: Command | Message) => Promise<void>;
   recv: (msgid: number) => Promise<Message>;
 };

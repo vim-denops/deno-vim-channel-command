@@ -8,7 +8,9 @@ import {
 } from "@std/testing/mock";
 import { Indexer } from "@lambdalisue/indexer";
 import { buildMessage, type Message } from "./message.ts";
-import { Client, type Session } from "./client.ts";
+import { Client } from "./client.ts";
+
+type Session = ConstructorParameters<typeof Client>[0];
 
 const session: Session = {
   send: () => unimplemented(),
