@@ -1,7 +1,7 @@
 # vim-channel-command
 
 [![JSR](https://jsr.io/badges/@denops/vim-channel-command)](https://jsr.io/@denops/vim-channel-command)
-[![Test](https://github.com/vim-denops/deno-vim-channel-command/workflows/Test/badge.svg)](https://github.com/vim-denops/deno-vim-channel-command/actions?query=workflow%3ATest)
+[![Test](https://github.com/vim-denops/deno-vim-channel-command/actions/workflows/test.yml/badge.svg)](https://github.com/vim-denops/deno-vim-channel-command/actions/workflows/test.yml)
 [![codecov](https://codecov.io/github/vim-denops/deno-vim-channel-command/branch/main/graph/badge.svg?token=FYH6RHO6UC)](https://codecov.io/github/vim-denops/deno-vim-channel-command)
 
 [Deno] module to support [Vim's Channel commands].
